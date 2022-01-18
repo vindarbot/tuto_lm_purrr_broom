@@ -1,0 +1,436 @@
+---
+author : "L. Cauquil"
+title: "Modèle linéaire mixte avec les packages purrr et broom.mixed"
+date: "`r Sys.Date()`"
+output:
+  html_document: 
+    code_folding: show
+    toc: yes
+    toc_float: yes
+    keep_md: TRUE
+  pdf_document:
+    toc: yes
+  word_document:
+    toc: yes
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE)
+```
+
+## **Packages et importation des données**
+
+### **Packages**
+
+```{r, warning = FALSE, message = FALSE}
+## Manipulations des données
+library(tibble)
+library(dplyr)
+library(tidyr)
+
+## Mise en forme des résultats stat
+library(purrr)
+library(broom)
+library(broom.mixed)
+
+## Objet phyloseq
+library(phyloseq)
+
+## Fonctions stat
+library(car)
+library(multcomp)
+library(lmerTest)
+library(emmeans)
+
+## Présentation des tables
+library(DT)
+library(flextable)
+library(xlsx)
+```
+
+### **Importation des données**
+
+On utilise l'objet phyloseq `tab_phylum`
+
+```{r, }
+load("data/data_phylum.RData")
+tab_Phylum
+```
+
+Il y a `r ntaxa(tab_Phylum)` phyla présents dans l'écosystème.
+
+
+## **Construction des objets**
+
+Différents objets créés:
+
+ - `RecapPhylum`: data.frame avec les moyennes, sd et SEM des abondances relatives de chaque phylum sans tenir compte des groupes
+ - `top_Phylum`: vecteur de Phyla qui ont au moins une moyenne des abondances relatives au sein d'un groupe Segment_Age > à 0,005 
+ - Rajout de la variable `Firm_bact_ratio` = ration Firmicutes/Bacteroidota
+ - `df_stat`: data.frame utilisé pour appliqué un modèle linéaire mixte sur les abondances relatives des phyla sélectionnés + `Firm_bact_ratio`
+
+Les analyses sont faites sur les abondances relatives
+
+```{r}
+## Transforme en abondance relative
+relatabunphy <- transform_sample_counts(tab_Phylum, function(OTU) OTU/sum(OTU))
+```
+
+La fonction `psmelt()` fusionne les tables `otu_table`, `sample_otu` et `tax_table` d'un objet phyloseq et crée un seul data.frame au format long.  
+Les phyla sont regroupés dans une seule colonne Phylum !
+
+```{r}
+dfrap <- psmelt(relatabunphy) 
+head(dfrap)
+```
+
+### **Tableau général avec mean, sd, SEM des abondances relatives par phylum**
+
+Construction de la table: tableau général sans tenir des groupes  
+
+```{r}
+RecapPhylum <- dfrap |>  
+  dplyr::select(Phylum,Abundance) |> 
+  group_by(Phylum) |> 
+  summarise(data.frame(mean = mean(Abundance),
+                       sd = sd(Abundance), 
+                       sem = sd(Abundance) / sqrt(length(Abundance))))
+RecapPhylum[,2:4] <- round(RecapPhylum[,2:4],4)*100
+
+datatable(RecapPhylum)
+```
+
+
+### **Sélection des phyla avec au moins une moyenne d'abondance relative > à 0,005 au sein d'un groupe Segment_Age**
+  
+Sélection des phyla  
+
+```{r}
+top_Phylum <- dfrap |>  
+  dplyr::select(Phylum, Abundance, Segment_Age) |> 
+  group_by(Phylum,Segment_Age) |> 
+  summarise_all(list(mean = mean)) |> 
+  dplyr::arrange(desc(mean)) |> 
+  dplyr::filter(mean >= 0.005) |> 
+  dplyr::arrange(Phylum, Segment_Age) |> 
+  distinct(Phylum) |> 
+  as_vector()
+top_Phylum
+```
+
+Selection des phyla dans la table générale
+
+```{r}
+dfrap <- dfrap |> 
+  dplyr::filter(Phylum %in% top_Phylum)
+```
+
+### **Rajout de la variable `Firm_bact_ratio` aux phyla**
+
+```{r}
+dfrap |> 
+  dplyr::select(Phylum, Abundance, Segment_Age, Piglet, Slaughter_date, Segment, Age) |> 
+#  arrange(Phylum) |> 
+  pivot_wider(names_from = Phylum,
+              values_from = Abundance) |> 
+  mutate(Firm_bact_ratio = Firmicutes/Bacteroidota) |> 
+  pivot_longer(cols = where(is.numeric),
+               names_to = "phylum", 
+               values_to = "abundance") -> df_stat
+```
+
+Transformation des abundances en racine de racine
+
+```{r}
+df_stat$abundance <- df_stat$abundance^0.25
+```
+
+## **Statistiques**  
+
+**Paramètres des contrastes**
+
+```{r}
+options(contrasts = c("contr.sum", "contr.poly"))
+```
+
+**Modèle linéaire mixte**
+
+Le modèle utilise 
+
+- la fonction `lmer` du package `lmerTest` 
+- l'effet piglet en variable aléatoire (1|Piglet) 
+
+Mais Piglet est niché dans slaughter_date
+
+- l'addition de Slaughter_date sur (1|Slaughter_date/Piglet)
+
+NB l'écriture (1|Slaughter_date/Piglet) est équivalente à (1|Piglet) +(1|Slaughter_date) car les porcs ont des identifiants différents entre les date d'abattage
+plus d'explication ici https://stats.stackexchange.com/questions/228800/crossed-vs-nested-random-effects-how-do-they-differ-and-how-are-they-specified  
+
+https://github.com/lcauquil/tuto_mix_model/blob/master/Modele_mixte_guidelines_2019.pdf pour les explications REML (REML pour restricted maximum likelihood) et ML (maximum likelihood)
+
+### **Modèle utilisé**
+
+**lmer(abundance ~ Segment * Age + (1|Piglet)+ (1|Slaughter_date), data = as.data.frame(data))**
+
+Application du modèle sur le phylum "Bacteroidota"
+
+```{r}
+df_stat |> 
+  filter(phylum == "Bacteroidota") -> lm_bacte
+
+lmer(abundance ~ Segment * Age + (1|Piglet)+ (1|Slaughter_date), data = lm_bacte)
+```
+
+### **Fonctions**
+
+On crées plusieurs fonctions à appliquer pour chacun des phylum.  
+Fonctions pour :
+
+ - appliquer le modèle
+ - effectuer le test shapiro
+ - calcluer les p-values
+ - récupérer les lettres
+
+Pour appliquer chaque fonction on utilise la fonction `map()` du package purrr. Les fonctions `map()` et dérivées visent à remplacer les boucles et les fonctions de la famille des apply.  
+
+Seule contrainte des fonctions `map()`, elles s'appliquent uniquement à des listes. Il faut donc convertir les data.frames en liste, mais c'est facile avec la fonction `split()`.
+
+**Exemple d'utilisation de la fonction `map()`**
+
+La fonction `map()` à généralement 2 arguments: une liste et une fonction
+
+```{r}
+x <- list(a = 1:10, b = 5:110)
+x
+map(x, mean)
+## sortie sous forme de data.frame
+map_df(x, mean)
+rm(x)
+```
+
+**Fonction split()**
+
+La fonction `split()` sépare un data.frame en liste à partir des différents niveaux d'une variable
+ 
+```{r}
+split(df_stat, df_stat$phylum)
+```
+
+**Fonction du modèle**
+
+```{r}
+fit_model <- function(data) {
+  mod_REML <- lmer(abundance ~ Segment * Age + (1|Piglet)+ (1|Slaughter_date), data = as.data.frame(data))
+	mod_REML_update <- update(mod_REML, REML = F)
+}
+```
+
+**Application de la fonction `fit_model` sur les Firmicutes**  
+
+```{r}
+df_stat |> 
+  dplyr::filter(phylum == "Firmicutes") |> 
+  fit_model() |> 
+  summary()
+```
+
+**Application de la fonction `fit_model` sur tous les phyla**  
+
+```{r}
+df_stat |> 
+  split(df_stat$phylum) |> 
+  map(fit_model) -> result
+```
+
+**Resultat pour les Firmicutes**
+
+```{r}
+result$Firmicutes |> summary()
+```
+
+### **Mise en forme des résultats**
+
+Pour mettre en forme les résultats on peut utiliser la fonction `tidy()` des packages broom et broom.mixed qui récupèrent les résultats des tests et les formatent en data.frame, toujours en utilisant la fonction `map()`
+
+La fonction `tidy()` s'applique à de nombreux tests:
+
+[Listes des méthodes prises en charge par broom](https://broom.tidymodels.org/articles/available-methods.html){target="blank"}
+
+[Listes des méthodes prises en charge par broom.mixed](https://cran.r-project.org/web/packages/broom.mixed/vignettes/broom_mixed_intro.html){target="blank"}
+
+Mise en forme des résultats pour les Firmicutes
+
+```{r}
+tidy(result$Firmicutes)
+```
+
+Appliqué à tous les phyla
+
+```{r}
+result_model <- df_stat |>
+  split(df_stat$phylum) |> 
+  map(fit_model) |> 
+  map(broom.mixed::tidy, .id = "phylum")
+result_model
+```
+
+Pour regrouper les résultats de chaque phylum dans une même table on utilise la function `map_df()` qui crée un directement un data.frame.
+
+```{r}
+result_model <- df_stat |>
+  split(df_stat$phylum) |> 
+  map(fit_model) |> 
+  map_df(broom.mixed::tidy, .id = "phylum")
+result_model
+```
+
+### **Même méthode pour les p.value, shapiro et lettres**
+
+**p.value**
+
+```{r}
+## fonction
+p_val <- function(data)
+{
+  Anova(data, type = "III")
+}
+
+## résultats
+result_pval <- df_stat |>
+  split(df_stat$phylum) |> 
+  map(fit_model) |>
+  map(p_val) |> 
+  map_dfr(tidy, .id = "phylum")
+result_pval
+```
+
+**Ajout des p-adjusted**
+
+```{r}
+result_pval |> 
+  #dplyr::filter(effect == "fixed") |> 
+  dplyr::select(phylum, term, p.value) |> 
+  pivot_wider(names_from = term,
+              values_from = p.value) |> 
+  mutate(p_adj_Segment = p.adjust(Segment, method = "BH"),
+         p_adj_Age = p.adjust(Age, method = "BH"),
+         p_adj_Age_Segment = p.adjust(`Segment:Age`, method = "BH")) -> df_pval
+df_pval
+```
+
+**Shapiro**
+
+```{r}
+## fonction
+p_shap <- function(data)
+{
+  tmp <- summary(data)
+  tmp2 <- shapiro.test(tmp$residuals)
+}
+
+## résultats
+df_shap <- df_stat |>
+  split(df_stat$phylum) |> 
+  map(fit_model) |>
+  map(p_shap) |> 
+  map_dfr(tidy, .id = "phylum") |> 
+  dplyr::select(-method) |> 
+  rename(W = statistic,
+         W_pval = p.value)
+df_shap
+```
+
+**Lettres**
+
+```{r}
+## fonction
+p_letters <- function(data)
+{
+  tmp <- emmeans(data, pairwise ~ Segment * Age)
+  tmp2 <- cld(tmp$emmeans, alpha = 0.05, Letters = letters, adjust ="tukey")
+}
+
+## résultats
+result_letters <- df_stat |>
+  split(df_stat$phylum) |> 
+  map(fit_model) |>
+  map(p_letters) |> 
+  map_dfr(tidy, .id = "phylum")
+result_letters
+```
+
+**Mise en forme des résultats des lettres en colonnes**
+
+```{r}
+df_letters <- result_letters |>
+  dplyr::select(phylum, Segment, Age, .group) |> 
+  pivot_wider(names_from = c(Segment, Age), 
+              values_from = .group)
+df_letters
+```
+
+### **Merge all results**
+
+```{r}
+left_join(df_shap, df_pval) |> 
+  left_join(df_letters) -> full_result
+full_result
+datatable(full_result)
+```
+
+```{r}
+flextable(full_result) -> tab 
+  theme_vanilla(tab)
+```
+
+**Save in excel sheet**
+
+```{r, eval = FALSE}
+write.xlsx(full_result,
+           file = "result_table.xlsx",
+           sheetName = "Stat model")
+```
+
+## **Remarque**
+
+**Attention à l'ordre des lignes quand on fusionne des data.frame, éviter les `cbind()`**  
+
+Utiliser la fonction `merge()` ou les fonctions `_join()` de dplyr qui garantissent le respect de l'ordre des lignes. La fusion s'effectue à partir d'une colonne commune aux 2 tables.
+
+Exemple fusion des taxon et de la table d'abondance
+
+```{r}
+TA <- data.frame(otu_table(relatabunphy))
+TAXA <- tax_table(tab_Phylum)[,"Phylum"]
+```
+
+**merge()**
+
+```{r}
+## merge()
+temp_merge <- merge(TAXA , TA, by = "row.names")
+```
+
+**left_join()**
+
+N'accepte que des data.frames
+On utilise la fonction rownames_to_column() du package tibble qui transforme les rownames en colonne avec "rowname" en en-tête par défaut.
+left_join peut repèrer automatiquement la colonne en commun: "rowname"  
+
+```{r}
+## left_join()
+temp_join <- left_join(rownames_to_column(data.frame(TAXA)), rownames_to_column(TA))
+```
+
+```{r}
+## par défaut merge() tri sur la colonne en commun
+temp_merge[1:5,1:5]
+temp_join[1:5,1:5]
+```
+
+
+
