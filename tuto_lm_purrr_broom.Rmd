@@ -1,7 +1,7 @@
 ---
 author : "L. Cauquil"
 title: "Modèle linéaire mixte avec les packages purrr et broom.mixed"
-date: "`r Sys.Date()`"
+date: "26-01-20222"
 output:
   html_document: 
     code_folding: show
