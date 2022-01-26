@@ -432,5 +432,10 @@ temp_merge[1:5,1:5]
 temp_join[1:5,1:5]
 ```
 
+**Session Info**
+
+```{r}
+sessionInfo()
+```
 
 
