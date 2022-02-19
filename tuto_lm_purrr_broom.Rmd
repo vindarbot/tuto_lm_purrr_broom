@@ -1,7 +1,7 @@
 ---
 author : "L. Cauquil"
 title: "Modèle linéaire mixte avec les packages purrr et broom.mixed"
-date: "26-01-20222"
+date: "26-01-2022"
 output:
   html_document: 
     code_folding: show
@@ -47,8 +47,9 @@ library(emmeans)
 
 ## Présentation des tables
 library(DT)
-library(flextable)
-library(xlsx)
+
+## Visualisations
+library(ggplot2)
 ```
 
 ### **Importation des données**
@@ -92,9 +93,9 @@ head(dfrap)
 Construction de la table: tableau général sans tenir des groupes  
 
 ```{r}
-RecapPhylum <- dfrap |>  
-  dplyr::select(Phylum,Abundance) |> 
-  group_by(Phylum) |> 
+RecapPhylum <- dfrap %>%  
+  dplyr::select(Phylum,Abundance) %>% 
+  group_by(Phylum) %>% 
   summarise(data.frame(mean = mean(Abundance),
                        sd = sd(Abundance), 
                        sem = sd(Abundance) / sqrt(length(Abundance))))
@@ -109,14 +110,14 @@ datatable(RecapPhylum)
 Sélection des phyla  
 
 ```{r}
-top_Phylum <- dfrap |>  
-  dplyr::select(Phylum, Abundance, Segment_Age) |> 
-  group_by(Phylum,Segment_Age) |> 
-  summarise_all(list(mean = mean)) |> 
-  dplyr::arrange(desc(mean)) |> 
-  dplyr::filter(mean >= 0.005) |> 
-  dplyr::arrange(Phylum, Segment_Age) |> 
-  distinct(Phylum) |> 
+top_Phylum <- dfrap %>%  
+  dplyr::select(Phylum, Abundance, Segment_Age) %>% 
+  group_by(Phylum,Segment_Age) %>% 
+  summarise_all(list(mean = mean)) %>% 
+  dplyr::arrange(desc(mean)) %>% 
+  dplyr::filter(mean >= 0.005) %>% 
+  dplyr::arrange(Phylum, Segment_Age) %>% 
+  distinct(Phylum) %>% 
   as_vector()
 top_Phylum
 ```
@@ -124,19 +125,19 @@ top_Phylum
 Selection des phyla dans la table générale
 
 ```{r}
-dfrap <- dfrap |> 
+dfrap <- dfrap %>% 
   dplyr::filter(Phylum %in% top_Phylum)
 ```
 
 ### **Rajout de la variable `Firm_bact_ratio` aux phyla**
 
 ```{r}
-dfrap |> 
-  dplyr::select(Phylum, Abundance, Segment_Age, Piglet, Slaughter_date, Segment, Age) |> 
-#  arrange(Phylum) |> 
+dfrap %>% 
+  dplyr::select(Phylum, Abundance, Segment_Age, Piglet, Slaughter_date, Segment, Age) %>% 
+#  arrange(Phylum) %>% 
   pivot_wider(names_from = Phylum,
-              values_from = Abundance) |> 
-  mutate(Firm_bact_ratio = Firmicutes/Bacteroidota) |> 
+              values_from = Abundance) %>% 
+  mutate(Firm_bact_ratio = Firmicutes/Bacteroidota) %>% 
   pivot_longer(cols = where(is.numeric),
                names_to = "phylum", 
                values_to = "abundance") -> df_stat
@@ -179,7 +180,7 @@ https://github.com/lcauquil/tuto_mix_model/blob/master/Modele_mixte_guidelines_2
 Application du modèle sur le phylum "Bacteroidota"
 
 ```{r}
-df_stat |> 
+df_stat %>% 
   filter(phylum == "Bacteroidota") -> lm_bacte
 
 lmer(abundance ~ Segment * Age + (1|Piglet)+ (1|Slaughter_date), data = lm_bacte)
@@ -232,24 +233,24 @@ fit_model <- function(data) {
 **Application de la fonction `fit_model` sur les Firmicutes**  
 
 ```{r}
-df_stat |> 
-  dplyr::filter(phylum == "Firmicutes") |> 
-  fit_model() |> 
+df_stat %>% 
+  dplyr::filter(phylum == "Firmicutes") %>% 
+  fit_model() %>% 
   summary()
 ```
 
 **Application de la fonction `fit_model` sur tous les phyla**  
 
 ```{r}
-df_stat |> 
-  split(df_stat$phylum) |> 
+df_stat %>% 
+  split(df_stat$phylum) %>% 
   map(fit_model) -> result
 ```
 
 **Resultat pour les Firmicutes**
 
 ```{r}
-result$Firmicutes |> summary()
+result$Firmicutes %>% summary()
 ```
 
 ### **Mise en forme des résultats**
@@ -271,9 +272,9 @@ tidy(result$Firmicutes)
 Appliqué à tous les phyla
 
 ```{r}
-result_model <- df_stat |>
-  split(df_stat$phylum) |> 
-  map(fit_model) |> 
+result_model <- df_stat %>%
+  split(df_stat$phylum) %>% 
+  map(fit_model) %>% 
   map(broom.mixed::tidy, .id = "phylum")
 result_model
 ```
@@ -281,9 +282,9 @@ result_model
 Pour regrouper les résultats de chaque phylum dans une même table on utilise la function `map_df()` qui crée un directement un data.frame.
 
 ```{r}
-result_model <- df_stat |>
-  split(df_stat$phylum) |> 
-  map(fit_model) |> 
+result_model <- df_stat %>%
+  split(df_stat$phylum) %>% 
+  map(fit_model) %>% 
   map_df(broom.mixed::tidy, .id = "phylum")
 result_model
 ```
@@ -300,10 +301,10 @@ p_val <- function(data)
 }
 
 ## résultats
-result_pval <- df_stat |>
-  split(df_stat$phylum) |> 
-  map(fit_model) |>
-  map(p_val) |> 
+result_pval <- df_stat %>%
+  split(df_stat$phylum) %>% 
+  map(fit_model) %>%
+  map(p_val) %>% 
   map_dfr(tidy, .id = "phylum")
 result_pval
 ```
@@ -311,11 +312,11 @@ result_pval
 **Ajout des p-adjusted**
 
 ```{r}
-result_pval |> 
-  #dplyr::filter(effect == "fixed") |> 
-  dplyr::select(phylum, term, p.value) |> 
+result_pval %>% 
+  #dplyr::filter(effect == "fixed") %>% 
+  dplyr::select(phylum, term, p.value) %>% 
   pivot_wider(names_from = term,
-              values_from = p.value) |> 
+              values_from = p.value) %>% 
   mutate(p_adj_Segment = p.adjust(Segment, method = "BH"),
          p_adj_Age = p.adjust(Age, method = "BH"),
          p_adj_Age_Segment = p.adjust(`Segment:Age`, method = "BH")) -> df_pval
@@ -333,12 +334,12 @@ p_shap <- function(data)
 }
 
 ## résultats
-df_shap <- df_stat |>
-  split(df_stat$phylum) |> 
-  map(fit_model) |>
-  map(p_shap) |> 
-  map_dfr(tidy, .id = "phylum") |> 
-  dplyr::select(-method) |> 
+df_shap <- df_stat %>%
+  split(df_stat$phylum) %>% 
+  map(fit_model) %>%
+  map(p_shap) %>% 
+  map_dfr(tidy, .id = "phylum") %>% 
+  dplyr::select(-method) %>% 
   rename(W = statistic,
          W_pval = p.value)
 df_shap
@@ -355,10 +356,10 @@ p_letters <- function(data)
 }
 
 ## résultats
-result_letters <- df_stat |>
-  split(df_stat$phylum) |> 
-  map(fit_model) |>
-  map(p_letters) |> 
+result_letters <- df_stat %>%
+  split(df_stat$phylum) %>% 
+  map(fit_model) %>%
+  map(p_letters) %>% 
   map_dfr(tidy, .id = "phylum")
 result_letters
 ```
@@ -366,8 +367,8 @@ result_letters
 **Mise en forme des résultats des lettres en colonnes**
 
 ```{r}
-df_letters <- result_letters |>
-  dplyr::select(phylum, Segment, Age, .group) |> 
+df_letters <- result_letters %>%
+  dplyr::select(phylum, Segment, Age, .group) %>% 
   pivot_wider(names_from = c(Segment, Age), 
               values_from = .group)
 df_letters
@@ -376,23 +377,17 @@ df_letters
 ### **Merge all results**
 
 ```{r}
-left_join(df_shap, df_pval) |> 
+left_join(df_shap, df_pval) %>% 
   left_join(df_letters) -> full_result
 full_result
 datatable(full_result)
 ```
 
-```{r}
-flextable(full_result) -> tab 
-  theme_vanilla(tab)
-```
 
 **Save in excel sheet**
 
 ```{r, eval = FALSE}
-write.xlsx(full_result,
-           file = "result_table.xlsx",
-           sheetName = "Stat model")
+full_result
 ```
 
 ## **Remarque**

@@ -1,7 +1,7 @@
 ---
 author : "L. Cauquil"
 title: "Modèle linéaire mixte avec les packages purrr et broom.mixed"
-date: "26-01-20222"
+date: "26-01-2022"
 output:
   html_document: 
     code_folding: show
@@ -45,8 +45,9 @@ library(emmeans)
 
 ## Présentation des tables
 library(DT)
-library(flextable)
-library(xlsx)
+
+## Visualisations
+library(ggplot2)
 ```
 
 ### **Importation des données**
@@ -126,9 +127,9 @@ Construction de la table: tableau général sans tenir des groupes
 
 
 ```r
-RecapPhylum <- dfrap |>  
-  dplyr::select(Phylum,Abundance) |> 
-  group_by(Phylum) |> 
+RecapPhylum <- dfrap %>%  
+  dplyr::select(Phylum,Abundance) %>% 
+  group_by(Phylum) %>% 
   summarise(data.frame(mean = mean(Abundance),
                        sd = sd(Abundance), 
                        sem = sd(Abundance) / sqrt(length(Abundance))))
@@ -149,30 +150,31 @@ Sélection des phyla
 
 
 ```r
-top_Phylum <- dfrap |>  
-  dplyr::select(Phylum, Abundance, Segment_Age) |> 
-  group_by(Phylum,Segment_Age) |> 
-  summarise_all(list(mean = mean)) |> 
-  dplyr::arrange(desc(mean)) |> 
-  dplyr::filter(mean >= 0.005) |> 
-  dplyr::arrange(Phylum, Segment_Age) |> 
-  distinct(Phylum) |> 
+top_Phylum <- dfrap %>%  
+  dplyr::select(Phylum, Abundance, Segment_Age) %>% 
+  group_by(Phylum,Segment_Age) %>% 
+  summarise_all(list(mean = mean)) %>% 
+  dplyr::arrange(desc(mean)) %>% 
+  dplyr::filter(mean >= 0.005) %>% 
+  dplyr::arrange(Phylum, Segment_Age) %>% 
+  distinct(Phylum) %>% 
   as_vector()
 top_Phylum
 ```
 
 ```
-##            Phylum1            Phylum2            Phylum3            Phylum4 
-## "Actinobacteriota"     "Bacteroidota" "Desulfobacterota"       "Firmicutes" 
-##            Phylum5            Phylum6 
-##   "Fusobacteriota"   "Proteobacteria"
+##          Phylum1          Phylum2          Phylum3          Phylum4 
+## Actinobacteriota     Bacteroidota Desulfobacterota       Firmicutes 
+##          Phylum5          Phylum6 
+##   Fusobacteriota   Proteobacteria 
+## 9 Levels: Actinobacteriota Bacteroidota Campylobacterota ... Spirochaetota
 ```
 
 Selection des phyla dans la table générale
 
 
 ```r
-dfrap <- dfrap |> 
+dfrap <- dfrap %>% 
   dplyr::filter(Phylum %in% top_Phylum)
 ```
 
@@ -180,12 +182,12 @@ dfrap <- dfrap |>
 
 
 ```r
-dfrap |> 
-  dplyr::select(Phylum, Abundance, Segment_Age, Piglet, Slaughter_date, Segment, Age) |> 
-#  arrange(Phylum) |> 
+dfrap %>% 
+  dplyr::select(Phylum, Abundance, Segment_Age, Piglet, Slaughter_date, Segment, Age) %>% 
+#  arrange(Phylum) %>% 
   pivot_wider(names_from = Phylum,
-              values_from = Abundance) |> 
-  mutate(Firm_bact_ratio = Firmicutes/Bacteroidota) |> 
+              values_from = Abundance) %>% 
+  mutate(Firm_bact_ratio = Firmicutes/Bacteroidota) %>% 
   pivot_longer(cols = where(is.numeric),
                names_to = "phylum", 
                values_to = "abundance") -> df_stat
@@ -231,7 +233,7 @@ Application du modèle sur le phylum "Bacteroidota"
 
 
 ```r
-df_stat |> 
+df_stat %>% 
   filter(phylum == "Bacteroidota") -> lm_bacte
 
 lmer(abundance ~ Segment * Age + (1|Piglet)+ (1|Slaughter_date), data = lm_bacte)
@@ -309,7 +311,7 @@ map_df(x, mean)
 ```
 
 ```
-## # A tibble: 1 x 2
+## # A tibble: 1 × 2
 ##       a     b
 ##   <dbl> <dbl>
 ## 1   5.5  57.5
@@ -330,7 +332,7 @@ split(df_stat, df_stat$phylum)
 
 ```
 ## $Actinobacteriota
-## # A tibble: 40 x 7
+## # A tibble: 40 × 7
 ##    Segment_Age Piglet Slaughter_date Segment Age   phylum           abundance
 ##    <fct>       <fct>  <chr>          <fct>   <fct> <chr>                <dbl>
 ##  1 Jejunum_D35 14     D3             Jejunum D35   Actinobacteriota     0.115
@@ -343,10 +345,10 @@ split(df_stat, df_stat$phylum)
 ##  8 Jejunum_D21 26     D6             Jejunum D21   Actinobacteriota     0.178
 ##  9 Jejunum_D21 18     D4             Jejunum D21   Actinobacteriota     0.149
 ## 10 Jejunum_D35 7      D1             Jejunum D35   Actinobacteriota     0.125
-## # ... with 30 more rows
+## # … with 30 more rows
 ## 
 ## $Bacteroidota
-## # A tibble: 40 x 7
+## # A tibble: 40 × 7
 ##    Segment_Age Piglet Slaughter_date Segment Age   phylum       abundance
 ##    <fct>       <fct>  <chr>          <fct>   <fct> <chr>            <dbl>
 ##  1 Jejunum_D35 14     D3             Jejunum D35   Bacteroidota    0.0966
@@ -359,10 +361,10 @@ split(df_stat, df_stat$phylum)
 ##  8 Jejunum_D21 26     D6             Jejunum D21   Bacteroidota    0.141 
 ##  9 Jejunum_D21 18     D4             Jejunum D21   Bacteroidota    0.120 
 ## 10 Jejunum_D35 7      D1             Jejunum D35   Bacteroidota    0.121 
-## # ... with 30 more rows
+## # … with 30 more rows
 ## 
 ## $Desulfobacterota
-## # A tibble: 40 x 7
+## # A tibble: 40 × 7
 ##    Segment_Age Piglet Slaughter_date Segment Age   phylum           abundance
 ##    <fct>       <fct>  <chr>          <fct>   <fct> <chr>                <dbl>
 ##  1 Jejunum_D35 14     D3             Jejunum D35   Desulfobacterota         0
@@ -375,10 +377,10 @@ split(df_stat, df_stat$phylum)
 ##  8 Jejunum_D21 26     D6             Jejunum D21   Desulfobacterota         0
 ##  9 Jejunum_D21 18     D4             Jejunum D21   Desulfobacterota         0
 ## 10 Jejunum_D35 7      D1             Jejunum D35   Desulfobacterota         0
-## # ... with 30 more rows
+## # … with 30 more rows
 ## 
 ## $Firm_bact_ratio
-## # A tibble: 40 x 7
+## # A tibble: 40 × 7
 ##    Segment_Age Piglet Slaughter_date Segment Age   phylum          abundance
 ##    <fct>       <fct>  <chr>          <fct>   <fct> <chr>               <dbl>
 ##  1 Jejunum_D35 14     D3             Jejunum D35   Firm_bact_ratio     10.4 
@@ -391,10 +393,10 @@ split(df_stat, df_stat$phylum)
 ##  8 Jejunum_D21 26     D6             Jejunum D21   Firm_bact_ratio      7.10
 ##  9 Jejunum_D21 18     D4             Jejunum D21   Firm_bact_ratio      8.35
 ## 10 Jejunum_D35 7      D1             Jejunum D35   Firm_bact_ratio      8.29
-## # ... with 30 more rows
+## # … with 30 more rows
 ## 
 ## $Firmicutes
-## # A tibble: 40 x 7
+## # A tibble: 40 × 7
 ##    Segment_Age Piglet Slaughter_date Segment Age   phylum     abundance
 ##    <fct>       <fct>  <chr>          <fct>   <fct> <chr>          <dbl>
 ##  1 Jejunum_D35 14     D3             Jejunum D35   Firmicutes     1.00 
@@ -407,10 +409,10 @@ split(df_stat, df_stat$phylum)
 ##  8 Jejunum_D21 26     D6             Jejunum D21   Firmicutes     0.999
 ##  9 Jejunum_D21 18     D4             Jejunum D21   Firmicutes     0.999
 ## 10 Jejunum_D35 7      D1             Jejunum D35   Firmicutes     0.999
-## # ... with 30 more rows
+## # … with 30 more rows
 ## 
 ## $Fusobacteriota
-## # A tibble: 40 x 7
+## # A tibble: 40 × 7
 ##    Segment_Age Piglet Slaughter_date Segment Age   phylum         abundance
 ##    <fct>       <fct>  <chr>          <fct>   <fct> <chr>              <dbl>
 ##  1 Jejunum_D35 14     D3             Jejunum D35   Fusobacteriota    0     
@@ -423,10 +425,10 @@ split(df_stat, df_stat$phylum)
 ##  8 Jejunum_D21 26     D6             Jejunum D21   Fusobacteriota    0     
 ##  9 Jejunum_D21 18     D4             Jejunum D21   Fusobacteriota    0.0846
 ## 10 Jejunum_D35 7      D1             Jejunum D35   Fusobacteriota    0.0770
-## # ... with 30 more rows
+## # … with 30 more rows
 ## 
 ## $Proteobacteria
-## # A tibble: 40 x 7
+## # A tibble: 40 × 7
 ##    Segment_Age Piglet Slaughter_date Segment Age   phylum         abundance
 ##    <fct>       <fct>  <chr>          <fct>   <fct> <chr>              <dbl>
 ##  1 Jejunum_D35 14     D3             Jejunum D35   Proteobacteria     0.123
@@ -439,7 +441,7 @@ split(df_stat, df_stat$phylum)
 ##  8 Jejunum_D21 26     D6             Jejunum D21   Proteobacteria     0.167
 ##  9 Jejunum_D21 18     D4             Jejunum D21   Proteobacteria     0.199
 ## 10 Jejunum_D35 7      D1             Jejunum D35   Proteobacteria     0.218
-## # ... with 30 more rows
+## # … with 30 more rows
 ```
 
 **Fonction du modèle**
@@ -456,9 +458,9 @@ fit_model <- function(data) {
 
 
 ```r
-df_stat |> 
-  dplyr::filter(phylum == "Firmicutes") |> 
-  fit_model() |> 
+df_stat %>% 
+  dplyr::filter(phylum == "Firmicutes") %>% 
+  fit_model() %>% 
   summary()
 ```
 
@@ -497,15 +499,15 @@ df_stat |>
 ## Age1        -0.034  0.112       
 ## Segmnt1:Ag1  0.112 -0.363 -0.127
 ## optimizer (nloptwrap) convergence code: 0 (OK)
-## boundary (singular) fit: see ?isSingular
+## boundary (singular) fit: see help('isSingular')
 ```
 
 **Application de la fonction `fit_model` sur tous les phyla**  
 
 
 ```r
-df_stat |> 
-  split(df_stat$phylum) |> 
+df_stat %>% 
+  split(df_stat$phylum) %>% 
   map(fit_model) -> result
 ```
 
@@ -513,7 +515,7 @@ df_stat |>
 
 
 ```r
-result$Firmicutes |> summary()
+result$Firmicutes %>% summary()
 ```
 
 ```
@@ -551,7 +553,7 @@ result$Firmicutes |> summary()
 ## Age1        -0.034  0.112       
 ## Segmnt1:Ag1  0.112 -0.363 -0.127
 ## optimizer (nloptwrap) convergence code: 0 (OK)
-## boundary (singular) fit: see ?isSingular
+## boundary (singular) fit: see help('isSingular')
 ```
 
 ### **Mise en forme des résultats**
@@ -572,141 +574,141 @@ tidy(result$Firmicutes)
 ```
 
 ```
-## # A tibble: 7 x 8
+## # A tibble: 7 × 8
 ##   effect   group          term      estimate std.error statistic    df   p.value
 ##   <chr>    <chr>          <chr>        <dbl>     <dbl>     <dbl> <dbl>     <dbl>
-## 1 fixed    <NA>           (Interce~  0.935     0.0145      64.7   23.1  1.33e-27
+## 1 fixed    <NA>           (Interce…  0.935     0.0145      64.7   23.1  1.33e-27
 ## 2 fixed    <NA>           Segment1   0.0340    0.00445      7.64  14.9  1.58e- 6
 ## 3 fixed    <NA>           Age1      -0.0165    0.0145      -1.14  23.1  2.66e- 1
-## 4 fixed    <NA>           Segment1~  0.00498   0.00445      1.12  14.9  2.81e- 1
-## 5 ran_pars Piglet         sd__(Int~  0.0674   NA           NA     NA   NA       
-## 6 ran_pars Slaughter_date sd__(Int~  0        NA           NA     NA   NA       
-## 7 ran_pars Residual       sd__Obse~  0.0236   NA           NA     NA   NA
+## 4 fixed    <NA>           Segment1…  0.00498   0.00445      1.12  14.9  2.81e- 1
+## 5 ran_pars Piglet         sd__(Int…  0.0674   NA           NA     NA   NA       
+## 6 ran_pars Slaughter_date sd__(Int…  0        NA           NA     NA   NA       
+## 7 ran_pars Residual       sd__Obse…  0.0236   NA           NA     NA   NA
 ```
 
 Appliqué à tous les phyla
 
 
 ```r
-result_model <- df_stat |>
-  split(df_stat$phylum) |> 
-  map(fit_model) |> 
+result_model <- df_stat %>%
+  split(df_stat$phylum) %>% 
+  map(fit_model) %>% 
   map(broom.mixed::tidy, .id = "phylum")
 result_model
 ```
 
 ```
 ## $Actinobacteriota
-## # A tibble: 7 x 8
+## # A tibble: 7 × 8
 ##   effect   group          term      estimate std.error statistic    df   p.value
 ##   <chr>    <chr>          <chr>        <dbl>     <dbl>     <dbl> <dbl>     <dbl>
-## 1 fixed    <NA>           (Interce~  0.220     0.0145     15.1    21.7  5.34e-13
+## 1 fixed    <NA>           (Interce…  0.220     0.0145     15.1    21.7  5.34e-13
 ## 2 fixed    <NA>           Segment1  -0.0124    0.00974    -1.27   15.3  2.23e- 1
 ## 3 fixed    <NA>           Age1       0.0130    0.0145      0.896  21.7  3.80e- 1
-## 4 fixed    <NA>           Segment1~  0.00247   0.00974     0.254  15.3  8.03e- 1
-## 5 ran_pars Piglet         sd__(Int~  0.0527   NA          NA      NA   NA       
-## 6 ran_pars Slaughter_date sd__(Int~  0        NA          NA      NA   NA       
-## 7 ran_pars Residual       sd__Obse~  0.0541   NA          NA      NA   NA       
+## 4 fixed    <NA>           Segment1…  0.00247   0.00974     0.254  15.3  8.03e- 1
+## 5 ran_pars Piglet         sd__(Int…  0.0527   NA          NA      NA   NA       
+## 6 ran_pars Slaughter_date sd__(Int…  0        NA          NA      NA   NA       
+## 7 ran_pars Residual       sd__Obse…  0.0541   NA          NA      NA   NA       
 ## 
 ## $Bacteroidota
-## # A tibble: 7 x 8
+## # A tibble: 7 × 8
 ##   effect   group          term      estimate std.error statistic    df   p.value
 ##   <chr>    <chr>          <chr>        <dbl>     <dbl>     <dbl> <dbl>     <dbl>
-## 1 fixed    <NA>           (Interce~  0.463      0.0310    15.0    22.6  3.37e-13
+## 1 fixed    <NA>           (Interce…  0.463      0.0310    15.0    22.6  3.37e-13
 ## 2 fixed    <NA>           Segment1  -0.267      0.0115   -23.2    14.4  7.60e-13
 ## 3 fixed    <NA>           Age1       0.0269     0.0310     0.867  22.6  3.95e- 1
-## 4 fixed    <NA>           Segment1~ -0.00476    0.0115    -0.414  14.4  6.85e- 1
-## 5 ran_pars Piglet         sd__(Int~  0.141     NA         NA      NA   NA       
-## 6 ran_pars Slaughter_date sd__(Int~  0         NA         NA      NA   NA       
-## 7 ran_pars Residual       sd__Obse~  0.0612    NA         NA      NA   NA       
+## 4 fixed    <NA>           Segment1… -0.00476    0.0115    -0.414  14.4  6.85e- 1
+## 5 ran_pars Piglet         sd__(Int…  0.141     NA         NA      NA   NA       
+## 6 ran_pars Slaughter_date sd__(Int…  0         NA         NA      NA   NA       
+## 7 ran_pars Residual       sd__Obse…  0.0612    NA         NA      NA   NA       
 ## 
 ## $Desulfobacterota
-## # A tibble: 7 x 8
+## # A tibble: 7 × 8
 ##   effect   group          term       estimate std.error statistic    df  p.value
 ##   <chr>    <chr>          <chr>         <dbl>     <dbl>     <dbl> <dbl>    <dbl>
-## 1 fixed    <NA>           (Intercep~  0.180      0.0114    15.8    11.8  2.55e-9
+## 1 fixed    <NA>           (Intercep…  0.180      0.0114    15.8    11.8  2.55e-9
 ## 2 fixed    <NA>           Segment1   -0.141      0.0109   -12.9    11.1  4.64e-8
 ## 3 fixed    <NA>           Age1        0.00305    0.0114     0.269  11.8  7.93e-1
-## 4 fixed    <NA>           Segment1:~ -0.00312    0.0109    -0.286  11.1  7.80e-1
-## 5 ran_pars Piglet         sd__(Inte~  0.0157    NA         NA      NA   NA      
-## 6 ran_pars Slaughter_date sd__(Inte~  0         NA         NA      NA   NA      
-## 7 ran_pars Residual       sd__Obser~  0.0640    NA         NA      NA   NA      
+## 4 fixed    <NA>           Segment1:… -0.00312    0.0109    -0.286  11.1  7.80e-1
+## 5 ran_pars Piglet         sd__(Inte…  0.0157    NA         NA      NA   NA      
+## 6 ran_pars Slaughter_date sd__(Inte…  0         NA         NA      NA   NA      
+## 7 ran_pars Residual       sd__Obser…  0.0640    NA         NA      NA   NA      
 ## 
 ## $Firm_bact_ratio
-## # A tibble: 7 x 8
-##   effect   group          term      estimate std.error statistic    df   p.value
-##   <chr>    <chr>          <chr>        <dbl>     <dbl>     <dbl> <dbl>     <dbl>
-## 1 fixed    <NA>           (Interce~    4.00      0.390    10.2   11.6    3.71e-7
-## 2 fixed    <NA>           Segment1     2.79      0.289     9.64   7.75   1.39e-5
-## 3 fixed    <NA>           Age1        -0.226     0.390    -0.579 11.6    5.74e-1
-## 4 fixed    <NA>           Segment1~   -0.106     0.289    -0.365  7.75   7.25e-1
-## 5 ran_pars Piglet         sd__(Int~    1.28     NA        NA     NA     NA      
-## 6 ran_pars Slaughter_date sd__(Int~    0        NA        NA     NA     NA      
-## 7 ran_pars Residual       sd__Obse~    1.63     NA        NA     NA     NA      
+## # A tibble: 7 × 8
+##   effect   group          term       estimate std.error statistic    df  p.value
+##   <chr>    <chr>          <chr>         <dbl>     <dbl>     <dbl> <dbl>    <dbl>
+## 1 fixed    <NA>           (Intercep…    4.00      0.390    10.2   11.6   3.71e-7
+## 2 fixed    <NA>           Segment1      2.79      0.289     9.64   7.75  1.39e-5
+## 3 fixed    <NA>           Age1         -0.226     0.390    -0.579 11.6   5.74e-1
+## 4 fixed    <NA>           Segment1:…   -0.106     0.289    -0.365  7.75  7.25e-1
+## 5 ran_pars Piglet         sd__(Inte…    1.28     NA        NA     NA    NA      
+## 6 ran_pars Slaughter_date sd__(Inte…    0        NA        NA     NA    NA      
+## 7 ran_pars Residual       sd__Obser…    1.63     NA        NA     NA    NA      
 ## 
 ## $Firmicutes
-## # A tibble: 7 x 8
+## # A tibble: 7 × 8
 ##   effect   group          term      estimate std.error statistic    df   p.value
 ##   <chr>    <chr>          <chr>        <dbl>     <dbl>     <dbl> <dbl>     <dbl>
-## 1 fixed    <NA>           (Interce~  0.935     0.0145      64.7   23.1  1.33e-27
+## 1 fixed    <NA>           (Interce…  0.935     0.0145      64.7   23.1  1.33e-27
 ## 2 fixed    <NA>           Segment1   0.0340    0.00445      7.64  14.9  1.58e- 6
 ## 3 fixed    <NA>           Age1      -0.0165    0.0145      -1.14  23.1  2.66e- 1
-## 4 fixed    <NA>           Segment1~  0.00498   0.00445      1.12  14.9  2.81e- 1
-## 5 ran_pars Piglet         sd__(Int~  0.0674   NA           NA     NA   NA       
-## 6 ran_pars Slaughter_date sd__(Int~  0        NA           NA     NA   NA       
-## 7 ran_pars Residual       sd__Obse~  0.0236   NA           NA     NA   NA       
+## 4 fixed    <NA>           Segment1…  0.00498   0.00445      1.12  14.9  2.81e- 1
+## 5 ran_pars Piglet         sd__(Int…  0.0674   NA           NA     NA   NA       
+## 6 ran_pars Slaughter_date sd__(Int…  0        NA           NA     NA   NA       
+## 7 ran_pars Residual       sd__Obse…  0.0236   NA           NA     NA   NA       
 ## 
 ## $Fusobacteriota
-## # A tibble: 7 x 8
+## # A tibble: 7 × 8
 ##   effect   group          term       estimate std.error statistic    df  p.value
 ##   <chr>    <chr>          <chr>         <dbl>     <dbl>     <dbl> <dbl>    <dbl>
-## 1 fixed    <NA>           (Intercep~   0.132     0.0272      4.85  22.5  7.18e-5
+## 1 fixed    <NA>           (Intercep…   0.132     0.0272      4.85  22.5  7.18e-5
 ## 2 fixed    <NA>           Segment1    -0.0262    0.0157     -1.67  15.1  1.15e-1
 ## 3 fixed    <NA>           Age1         0.0854    0.0272      3.14  22.5  4.68e-3
-## 4 fixed    <NA>           Segment1:~  -0.0339    0.0157     -2.17  15.1  4.65e-2
-## 5 ran_pars Piglet         sd__(Inte~   0.109    NA          NA     NA   NA      
-## 6 ran_pars Slaughter_date sd__(Inte~   0        NA          NA     NA   NA      
-## 7 ran_pars Residual       sd__Obser~   0.0857   NA          NA     NA   NA      
+## 4 fixed    <NA>           Segment1:…  -0.0339    0.0157     -2.17  15.1  4.65e-2
+## 5 ran_pars Piglet         sd__(Inte…   0.109    NA          NA     NA   NA      
+## 6 ran_pars Slaughter_date sd__(Inte…   0        NA          NA     NA   NA      
+## 7 ran_pars Residual       sd__Obser…   0.0857   NA          NA     NA   NA      
 ## 
 ## $Proteobacteria
-## # A tibble: 7 x 8
+## # A tibble: 7 × 8
 ##   effect   group          term       estimate std.error statistic    df  p.value
 ##   <chr>    <chr>          <chr>         <dbl>     <dbl>     <dbl> <dbl>    <dbl>
-## 1 fixed    <NA>           (Intercep~ 0.315       0.0366    8.61    5.37  2.41e-4
+## 1 fixed    <NA>           (Intercep… 0.315       0.0366    8.61    5.37  2.41e-4
 ## 2 fixed    <NA>           Segment1   0.000497    0.0211    0.0236 12.2   9.82e-1
 ## 3 fixed    <NA>           Age1       0.0165      0.0366    0.451   5.37  6.69e-1
-## 4 fixed    <NA>           Segment1:~ 0.000562    0.0211    0.0266 12.2   9.79e-1
-## 5 ran_pars Piglet         sd__(Inte~ 0.123      NA        NA      NA    NA      
-## 6 ran_pars Slaughter_date sd__(Inte~ 0.0393     NA        NA      NA    NA      
-## 7 ran_pars Residual       sd__Obser~ 0.116      NA        NA      NA    NA
+## 4 fixed    <NA>           Segment1:… 0.000562    0.0211    0.0266 12.2   9.79e-1
+## 5 ran_pars Piglet         sd__(Inte… 0.123      NA        NA      NA    NA      
+## 6 ran_pars Slaughter_date sd__(Inte… 0.0393     NA        NA      NA    NA      
+## 7 ran_pars Residual       sd__Obser… 0.116      NA        NA      NA    NA
 ```
 
 Pour regrouper les résultats de chaque phylum dans une même table on utilise la function `map_df()` qui crée un directement un data.frame.
 
 
 ```r
-result_model <- df_stat |>
-  split(df_stat$phylum) |> 
-  map(fit_model) |> 
+result_model <- df_stat %>%
+  split(df_stat$phylum) %>% 
+  map(fit_model) %>% 
   map_df(broom.mixed::tidy, .id = "phylum")
 result_model
 ```
 
 ```
-## # A tibble: 49 x 9
-##    phylum    effect group   term    estimate std.error statistic    df   p.value
-##    <chr>     <chr>  <chr>   <chr>      <dbl>     <dbl>     <dbl> <dbl>     <dbl>
-##  1 Actinoba~ fixed  <NA>    (Inter~  0.220     0.0145     15.1    21.7  5.34e-13
-##  2 Actinoba~ fixed  <NA>    Segmen~ -0.0124    0.00974    -1.27   15.3  2.23e- 1
-##  3 Actinoba~ fixed  <NA>    Age1     0.0130    0.0145      0.896  21.7  3.80e- 1
-##  4 Actinoba~ fixed  <NA>    Segmen~  0.00247   0.00974     0.254  15.3  8.03e- 1
-##  5 Actinoba~ ran_p~ Piglet  sd__(I~  0.0527   NA          NA      NA   NA       
-##  6 Actinoba~ ran_p~ Slaugh~ sd__(I~  0        NA          NA      NA   NA       
-##  7 Actinoba~ ran_p~ Residu~ sd__Ob~  0.0541   NA          NA      NA   NA       
-##  8 Bacteroi~ fixed  <NA>    (Inter~  0.463     0.0310     15.0    22.6  3.37e-13
-##  9 Bacteroi~ fixed  <NA>    Segmen~ -0.267     0.0115    -23.2    14.4  7.60e-13
-## 10 Bacteroi~ fixed  <NA>    Age1     0.0269    0.0310      0.867  22.6  3.95e- 1
-## # ... with 39 more rows
+## # A tibble: 49 × 9
+##    phylum        effect group term  estimate std.error statistic    df   p.value
+##    <chr>         <chr>  <chr> <chr>    <dbl>     <dbl>     <dbl> <dbl>     <dbl>
+##  1 Actinobacter… fixed  <NA>  (Int…  0.220     0.0145     15.1    21.7  5.34e-13
+##  2 Actinobacter… fixed  <NA>  Segm… -0.0124    0.00974    -1.27   15.3  2.23e- 1
+##  3 Actinobacter… fixed  <NA>  Age1   0.0130    0.0145      0.896  21.7  3.80e- 1
+##  4 Actinobacter… fixed  <NA>  Segm…  0.00247   0.00974     0.254  15.3  8.03e- 1
+##  5 Actinobacter… ran_p… Pigl… sd__…  0.0527   NA          NA      NA   NA       
+##  6 Actinobacter… ran_p… Slau… sd__…  0        NA          NA      NA   NA       
+##  7 Actinobacter… ran_p… Resi… sd__…  0.0541   NA          NA      NA   NA       
+##  8 Bacteroidota  fixed  <NA>  (Int…  0.463     0.0310     15.0    22.6  3.37e-13
+##  9 Bacteroidota  fixed  <NA>  Segm… -0.267     0.0115    -23.2    14.4  7.60e-13
+## 10 Bacteroidota  fixed  <NA>  Age1   0.0269    0.0310      0.867  22.6  3.95e- 1
+## # … with 39 more rows
 ```
 
 ### **Même méthode pour les p.value, shapiro et lettres**
@@ -722,16 +724,16 @@ p_val <- function(data)
 }
 
 ## résultats
-result_pval <- df_stat |>
-  split(df_stat$phylum) |> 
-  map(fit_model) |>
-  map(p_val) |> 
+result_pval <- df_stat %>%
+  split(df_stat$phylum) %>% 
+  map(fit_model) %>%
+  map(p_val) %>% 
   map_dfr(tidy, .id = "phylum")
 result_pval
 ```
 
 ```
-## # A tibble: 28 x 5
+## # A tibble: 28 × 5
 ##    phylum           term        statistic    df   p.value
 ##    <chr>            <chr>           <dbl> <dbl>     <dbl>
 ##  1 Actinobacteriota (Intercept)  229.         1 8.68e- 52
@@ -744,18 +746,18 @@ result_pval
 ##  8 Bacteroidota     Segment:Age    0.172      1 6.79e-  1
 ##  9 Desulfobacterota (Intercept)  250.         1 2.48e- 56
 ## 10 Desulfobacterota Segment      168.         1 2.38e- 38
-## # ... with 18 more rows
+## # … with 18 more rows
 ```
 
 **Ajout des p-adjusted**
 
 
 ```r
-result_pval |> 
-  #dplyr::filter(effect == "fixed") |> 
-  dplyr::select(phylum, term, p.value) |> 
+result_pval %>% 
+  #dplyr::filter(effect == "fixed") %>% 
+  dplyr::select(phylum, term, p.value) %>% 
   pivot_wider(names_from = term,
-              values_from = p.value) |> 
+              values_from = p.value) %>% 
   mutate(p_adj_Segment = p.adjust(Segment, method = "BH"),
          p_adj_Age = p.adjust(Age, method = "BH"),
          p_adj_Age_Segment = p.adjust(`Segment:Age`, method = "BH")) -> df_pval
@@ -763,17 +765,17 @@ df_pval
 ```
 
 ```
-## # A tibble: 7 x 8
+## # A tibble: 7 × 8
 ##   phylum   `(Intercept)`   Segment     Age `Segment:Age` p_adj_Segment p_adj_Age
 ##   <chr>            <dbl>     <dbl>   <dbl>         <dbl>         <dbl>     <dbl>
-## 1 Actinob~      8.68e-52 2.04e-  1 0.370          0.799      2.38e-  1    0.675 
-## 2 Bactero~      1.52e-50 2.23e-119 0.386          0.679      1.56e-118    0.675 
-## 3 Desulfo~      2.48e-56 2.38e- 38 0.788          0.775      8.33e- 38    0.788 
-## 4 Firm_ba~      1.31e-24 5.42e- 22 0.563          0.715      1.27e- 21    0.760 
-## 5 Firmicu~      0        2.22e- 14 0.254          0.264      3.89e- 14    0.675 
-## 6 Fusobac~      1.24e- 6 9.45e-  2 0.00169        0.0302     1.32e-  1    0.0118
-## 7 Proteob~      7.01e-18 9.81e-  1 0.652          0.979      9.81e-  1    0.760 
-## # ... with 1 more variable: p_adj_Age_Segment <dbl>
+## 1 Actinob…      8.68e-52 2.04e-  1 0.370          0.799      2.38e-  1    0.675 
+## 2 Bactero…      1.52e-50 2.23e-119 0.386          0.679      1.56e-118    0.675 
+## 3 Desulfo…      2.48e-56 2.38e- 38 0.788          0.775      8.33e- 38    0.788 
+## 4 Firm_ba…      1.31e-24 5.42e- 22 0.563          0.715      1.27e- 21    0.760 
+## 5 Firmicu…      0        2.22e- 14 0.254          0.264      3.89e- 14    0.675 
+## 6 Fusobac…      1.24e- 6 9.45e-  2 0.00169        0.0302     1.32e-  1    0.0118
+## 7 Proteob…      7.01e-18 9.81e-  1 0.652          0.979      9.81e-  1    0.760 
+## # … with 1 more variable: p_adj_Age_Segment <dbl>
 ```
 
 **Shapiro**
@@ -788,19 +790,19 @@ p_shap <- function(data)
 }
 
 ## résultats
-df_shap <- df_stat |>
-  split(df_stat$phylum) |> 
-  map(fit_model) |>
-  map(p_shap) |> 
-  map_dfr(tidy, .id = "phylum") |> 
-  dplyr::select(-method) |> 
+df_shap <- df_stat %>%
+  split(df_stat$phylum) %>% 
+  map(fit_model) %>%
+  map(p_shap) %>% 
+  map_dfr(tidy, .id = "phylum") %>% 
+  dplyr::select(-method) %>% 
   rename(W = statistic,
          W_pval = p.value)
 df_shap
 ```
 
 ```
-## # A tibble: 7 x 3
+## # A tibble: 7 × 3
 ##   phylum               W   W_pval
 ##   <chr>            <dbl>    <dbl>
 ## 1 Actinobacteriota 0.953 0.0948  
@@ -824,44 +826,44 @@ p_letters <- function(data)
 }
 
 ## résultats
-result_letters <- df_stat |>
-  split(df_stat$phylum) |> 
-  map(fit_model) |>
-  map(p_letters) |> 
+result_letters <- df_stat %>%
+  split(df_stat$phylum) %>% 
+  map(fit_model) %>%
+  map(p_letters) %>% 
   map_dfr(tidy, .id = "phylum")
 result_letters
 ```
 
 ```
-## # A tibble: 28 x 9
+## # A tibble: 28 × 9
 ##    phylum       Segment Age   estimate std.error    df conf.low conf.high .group
 ##    <chr>        <chr>   <chr>    <dbl>     <dbl> <dbl>    <dbl>     <dbl> <chr> 
-##  1 Actinobacte~ Jejunum D35     0.192     0.0229  6.88  0.115      0.268  " a"  
-##  2 Actinobacte~ Colon   D35     0.222     0.0354 15.0   0.121      0.322  " a"  
-##  3 Actinobacte~ Jejunum D21     0.223     0.0229  6.74  0.146      0.300  " a"  
-##  4 Actinobacte~ Colon   D21     0.243     0.0238  7.58  0.165      0.320  " a"  
+##  1 Actinobacte… Jejunum D35     0.192     0.0229  6.88  0.115      0.268  " a"  
+##  2 Actinobacte… Colon   D35     0.222     0.0354 15.0   0.121      0.322  " a"  
+##  3 Actinobacte… Jejunum D21     0.223     0.0229  6.74  0.146      0.300  " a"  
+##  4 Actinobacte… Colon   D21     0.243     0.0238  7.58  0.165      0.320  " a"  
 ##  5 Bacteroidota Jejunum D35     0.175     0.0464  5.22  0.00242    0.347  " a " 
 ##  6 Bacteroidota Jejunum D21     0.219     0.0464  5.17  0.0460     0.392  " a " 
 ##  7 Bacteroidota Colon   D35     0.698     0.0562  9.37  0.526      0.871  "  b" 
 ##  8 Bacteroidota Colon   D21     0.762     0.0470  5.44  0.590      0.933  "  b" 
-##  9 Desulfobact~ Jejunum D21     0.0384    0.0200 10.6  -0.0216     0.0984 " a " 
-## 10 Desulfobact~ Jejunum D35     0.0386    0.0200 10.7  -0.0213     0.0985 " a " 
-## # ... with 18 more rows
+##  9 Desulfobact… Jejunum D21     0.0384    0.0200 10.6  -0.0216     0.0984 " a " 
+## 10 Desulfobact… Jejunum D35     0.0386    0.0200 10.7  -0.0213     0.0985 " a " 
+## # … with 18 more rows
 ```
 
 **Mise en forme des résultats des lettres en colonnes**
 
 
 ```r
-df_letters <- result_letters |>
-  dplyr::select(phylum, Segment, Age, .group) |> 
+df_letters <- result_letters %>%
+  dplyr::select(phylum, Segment, Age, .group) %>% 
   pivot_wider(names_from = c(Segment, Age), 
               values_from = .group)
 df_letters
 ```
 
 ```
-## # A tibble: 7 x 5
+## # A tibble: 7 × 5
 ##   phylum           Jejunum_D35 Colon_D35 Jejunum_D21 Colon_D21
 ##   <chr>            <chr>       <chr>     <chr>       <chr>    
 ## 1 Actinobacteriota " a"        " a"      " a"        " a"     
@@ -877,13 +879,13 @@ df_letters
 
 
 ```r
-left_join(df_shap, df_pval) |> 
+left_join(df_shap, df_pval) %>% 
   left_join(df_letters) -> full_result
 full_result
 ```
 
 ```
-## # A tibble: 7 x 14
+## # A tibble: 7 × 14
 ##   phylum               W   W_pval `(Intercept)`   Segment     Age `Segment:Age`
 ##   <chr>            <dbl>    <dbl>         <dbl>     <dbl>   <dbl>         <dbl>
 ## 1 Actinobacteriota 0.953 0.0948        8.68e-52 2.04e-  1 0.370          0.799 
@@ -893,7 +895,7 @@ full_result
 ## 5 Firmicutes       0.941 0.0382        0        2.22e- 14 0.254          0.264 
 ## 6 Fusobacteriota   0.958 0.139         1.24e- 6 9.45e-  2 0.00169        0.0302
 ## 7 Proteobacteria   0.923 0.00942       7.01e-18 9.81e-  1 0.652          0.979 
-## # ... with 7 more variables: p_adj_Segment <dbl>, p_adj_Age <dbl>,
+## # … with 7 more variables: p_adj_Segment <dbl>, p_adj_Age <dbl>,
 ## #   p_adj_Age_Segment <dbl>, Jejunum_D35 <chr>, Colon_D35 <chr>,
 ## #   Jejunum_D21 <chr>, Colon_D21 <chr>
 ```
@@ -904,80 +906,15 @@ datatable(full_result)
 
 ```{=html}
 <div id="htmlwidget-d9cd19af78ac36d9f2c3" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-d9cd19af78ac36d9f2c3">{"x":{"filter":"none","vertical":false,"data":[["1","2","3","4","5","6","7"],["Actinobacteriota","Bacteroidota","Desulfobacterota","Firm_bact_ratio","Firmicutes","Fusobacteriota","Proteobacteria"],[0.952816431913969,0.978257055429324,0.87395600563975,0.890610644660262,0.941274799188378,0.957652847375552,0.922773968771566],[0.0948139591776235,0.625039810354336,0.000363131036589038,0.00103072631667422,0.0381823346558611,0.139160797423286,0.00942417147296379],[8.67902386441662e-52,1.51879223584256e-50,2.47639052015161e-56,1.31007350652692e-24,0,1.24096039370785e-06,7.00563748427384e-18],[0.20368154415844,2.22884598375759e-119,2.37893614847488e-38,5.4229034510239e-22,2.22262996197009e-14,0.0944989730731643,0.981193815184475],[0.370329339067513,0.385824079973006,0.788202948387599,0.562779217750694,0.253949991201482,0.00169223904251737,0.651682555154706],[0.799475377478624,0.678548595051256,0.774813553541423,0.715141158473788,0.263501323054347,0.0301846754262807,0.97875681540932],[0.237628468184846,1.56019218863031e-118,8.32627651966209e-38,1.26534413857224e-21,3.88960243344766e-14,0.13229856230243,0.981193815184475],[0.67519213995276,0.67519213995276,0.788202948387599,0.760296314347157,0.67519213995276,0.0118456732976216,0.760296314347157],[0.932721273725062,0.932721273725062,0.932721273725062,0.932721273725062,0.922254630690215,0.211292727983965,0.97875681540932],[" a"," a "," a ","  b","  b d"," a "," a"],[" a","  b","  b"," a "," a c "," a "," a"],[" a"," a "," a ","  b","   cd"," a "," a"],[" a","  b","  b"," a "," ab  ","  b"," a"]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>phylum<\/th>\n      <th>W<\/th>\n      <th>W_pval<\/th>\n      <th>(Intercept)<\/th>\n      <th>Segment<\/th>\n      <th>Age<\/th>\n      <th>Segment:Age<\/th>\n      <th>p_adj_Segment<\/th>\n      <th>p_adj_Age<\/th>\n      <th>p_adj_Age_Segment<\/th>\n      <th>Jejunum_D35<\/th>\n      <th>Colon_D35<\/th>\n      <th>Jejunum_D21<\/th>\n      <th>Colon_D21<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[2,3,4,5,6,7,8,9,10]},{"orderable":false,"targets":0}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<script type="application/json" data-for="htmlwidget-d9cd19af78ac36d9f2c3">{"x":{"filter":"none","vertical":false,"data":[["1","2","3","4","5","6","7"],["Actinobacteriota","Bacteroidota","Desulfobacterota","Firm_bact_ratio","Firmicutes","Fusobacteriota","Proteobacteria"],[0.952816431913969,0.978257055429324,0.87395600563975,0.890610644660262,0.941274799188378,0.957652847375552,0.922773968771566],[0.0948139591776235,0.625039810354336,0.000363131036589038,0.00103072631667422,0.0381823346558611,0.139160797423286,0.00942417147296379],[8.67902386441662e-52,1.51879223584256e-50,2.47639052015161e-56,1.31007350652692e-24,0,1.24096039370785e-06,7.00563748427384e-18],[0.20368154415844,2.22884598375759e-119,2.37893614847488e-38,5.4229034510239e-22,2.22262996197009e-14,0.0944989730731643,0.981193815184475],[0.370329339067513,0.385824079973006,0.788202948387599,0.562779217750694,0.253949991201482,0.00169223904251737,0.651682555154706],[0.799475377478624,0.678548595051256,0.774813553541423,0.715141158473788,0.263501323054347,0.0301846754262807,0.97875681540932],[0.237628468184846,1.56019218863031e-118,8.32627651966209e-38,1.26534413857224e-21,3.88960243344766e-14,0.13229856230243,0.981193815184475],[0.67519213995276,0.67519213995276,0.788202948387599,0.760296314347157,0.67519213995276,0.0118456732976216,0.760296314347157],[0.932721273725062,0.932721273725062,0.932721273725062,0.932721273725062,0.922254630690214,0.211292727983965,0.97875681540932],[" a"," a "," a ","  b","  b d"," a "," a"],[" a","  b","  b"," a "," a c "," a "," a"],[" a"," a "," a ","  b","   cd"," a "," a"],[" a","  b","  b"," a "," ab  ","  b"," a"]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>phylum<\/th>\n      <th>W<\/th>\n      <th>W_pval<\/th>\n      <th>(Intercept)<\/th>\n      <th>Segment<\/th>\n      <th>Age<\/th>\n      <th>Segment:Age<\/th>\n      <th>p_adj_Segment<\/th>\n      <th>p_adj_Age<\/th>\n      <th>p_adj_Age_Segment<\/th>\n      <th>Jejunum_D35<\/th>\n      <th>Colon_D35<\/th>\n      <th>Jejunum_D21<\/th>\n      <th>Colon_D21<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[2,3,4,5,6,7,8,9,10]},{"orderable":false,"targets":0}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
-
-```r
-flextable(full_result) -> tab 
-  theme_vanilla(tab)
-```
-
-```{=html}
-<template id="29492e1f-45c8-474d-8dca-a75bfb9b101d"><style>
-.tabwid table{
-  border-spacing:0px !important;
-  border-collapse:collapse;
-  line-height:1;
-  margin-left:auto;
-  margin-right:auto;
-  border-width: 0;
-  display: table;
-  margin-top: 1.275em;
-  margin-bottom: 1.275em;
-  border-color: transparent;
-}
-.tabwid_left table{
-  margin-left:0;
-}
-.tabwid_right table{
-  margin-right:0;
-}
-.tabwid td {
-    padding: 0;
-}
-.tabwid a {
-  text-decoration: none;
-}
-.tabwid thead {
-    background-color: transparent;
-}
-.tabwid tfoot {
-    background-color: transparent;
-}
-.tabwid table tr {
-background-color: transparent;
-}
-</style><div class="tabwid"><style>.cl-5e0efecc{}.cl-5e09597c{font-family:'Arial';font-size:11pt;font-weight:bold;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-5e09597d{font-family:'Arial';font-size:11pt;font-weight:normal;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-5e09806e{margin:0;text-align:left;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-5e09806f{margin:0;text-align:right;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-5e09a7c4{width:54pt;background-color:transparent;vertical-align: middle;border-bottom: 0.5pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-5e09a7c5{width:54pt;background-color:transparent;vertical-align: middle;border-bottom: 0.5pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-5e09a7c6{width:54pt;background-color:transparent;vertical-align: middle;border-bottom: 0.5pt solid rgba(102, 102, 102, 1.00);border-top: 0.5pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-5e09a7c7{width:54pt;background-color:transparent;vertical-align: middle;border-bottom: 0.5pt solid rgba(102, 102, 102, 1.00);border-top: 0.5pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-5e09a7c8{width:54pt;background-color:transparent;vertical-align: middle;border-bottom: 2pt solid rgba(102, 102, 102, 1.00);border-top: 0.5pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-5e09a7c9{width:54pt;background-color:transparent;vertical-align: middle;border-bottom: 2pt solid rgba(102, 102, 102, 1.00);border-top: 0.5pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-5e09a7ca{width:54pt;background-color:transparent;vertical-align: middle;border-bottom: 2pt solid rgba(102, 102, 102, 1.00);border-top: 2pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-5e09a7cb{width:54pt;background-color:transparent;vertical-align: middle;border-bottom: 2pt solid rgba(102, 102, 102, 1.00);border-top: 2pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}</style><table class='cl-5e0efecc'>
-```
-
-```{=html}
-<thead><tr style="overflow-wrap:break-word;"><td class="cl-5e09a7cb"><p class="cl-5e09806e"><span class="cl-5e09597c">phylum</span></p></td><td class="cl-5e09a7ca"><p class="cl-5e09806f"><span class="cl-5e09597c">W</span></p></td><td class="cl-5e09a7ca"><p class="cl-5e09806f"><span class="cl-5e09597c">W_pval</span></p></td><td class="cl-5e09a7ca"><p class="cl-5e09806f"><span class="cl-5e09597c">(Intercept)</span></p></td><td class="cl-5e09a7ca"><p class="cl-5e09806f"><span class="cl-5e09597c">Segment</span></p></td><td class="cl-5e09a7ca"><p class="cl-5e09806f"><span class="cl-5e09597c">Age</span></p></td><td class="cl-5e09a7ca"><p class="cl-5e09806f"><span class="cl-5e09597c">Segment:Age</span></p></td><td class="cl-5e09a7ca"><p class="cl-5e09806f"><span class="cl-5e09597c">p_adj_Segment</span></p></td><td class="cl-5e09a7ca"><p class="cl-5e09806f"><span class="cl-5e09597c">p_adj_Age</span></p></td><td class="cl-5e09a7ca"><p class="cl-5e09806f"><span class="cl-5e09597c">p_adj_Age_Segment</span></p></td><td class="cl-5e09a7cb"><p class="cl-5e09806e"><span class="cl-5e09597c">Jejunum_D35</span></p></td><td class="cl-5e09a7cb"><p class="cl-5e09806e"><span class="cl-5e09597c">Colon_D35</span></p></td><td class="cl-5e09a7cb"><p class="cl-5e09806e"><span class="cl-5e09597c">Jejunum_D21</span></p></td><td class="cl-5e09a7cb"><p class="cl-5e09806e"><span class="cl-5e09597c">Colon_D21</span></p></td></tr></thead><tbody><tr style="overflow-wrap:break-word;"><td class="cl-5e09a7c4"><p class="cl-5e09806e"><span class="cl-5e09597d">Actinobacteriota</span></p></td><td class="cl-5e09a7c5"><p class="cl-5e09806f"><span class="cl-5e09597d">0.9528164</span></p></td><td class="cl-5e09a7c5"><p class="cl-5e09806f"><span class="cl-5e09597d">0.094813959</span></p></td><td class="cl-5e09a7c5"><p class="cl-5e09806f"><span class="cl-5e09597d">0.00000000000000000000000000000000000000000000000000086790238644</span></p></td><td class="cl-5e09a7c5"><p class="cl-5e09806f"><span class="cl-5e09597d">0.20368154415843975346689376237918622791767120361328125000000000000000000000000000000000000000000000000000000000000000000000000</span></p></td><td class="cl-5e09a7c5"><p class="cl-5e09806f"><span class="cl-5e09597d">0.370329339</span></p></td><td class="cl-5e09a7c5"><p class="cl-5e09806f"><span class="cl-5e09597d">0.79947538</span></p></td><td class="cl-5e09a7c5"><p class="cl-5e09806f"><span class="cl-5e09597d">0.2376284681848463975484264665283262729644775390625000000000000000000000000000000000000000000000000000000000000000000000000000</span></p></td><td class="cl-5e09a7c5"><p class="cl-5e09806f"><span class="cl-5e09597d">0.67519214</span></p></td><td class="cl-5e09a7c5"><p class="cl-5e09806f"><span class="cl-5e09597d">0.9327213</span></p></td><td class="cl-5e09a7c4"><p class="cl-5e09806e"><span class="cl-5e09597d"> a</span></p></td><td class="cl-5e09a7c4"><p class="cl-5e09806e"><span class="cl-5e09597d"> a</span></p></td><td class="cl-5e09a7c4"><p class="cl-5e09806e"><span class="cl-5e09597d"> a</span></p></td><td class="cl-5e09a7c4"><p class="cl-5e09806e"><span class="cl-5e09597d"> a</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-5e09a7c7"><p class="cl-5e09806e"><span class="cl-5e09597d">Bacteroidota</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.9782571</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.625039810</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.00000000000000000000000000000000000000000000000001518792235843</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002228846</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.385824080</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.67854860</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001560192</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.67519214</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.9327213</span></p></td><td class="cl-5e09a7c7"><p class="cl-5e09806e"><span class="cl-5e09597d"> a </span></p></td><td class="cl-5e09a7c7"><p class="cl-5e09806e"><span class="cl-5e09597d">  b</span></p></td><td class="cl-5e09a7c7"><p class="cl-5e09806e"><span class="cl-5e09597d"> a </span></p></td><td class="cl-5e09a7c7"><p class="cl-5e09806e"><span class="cl-5e09597d">  b</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-5e09a7c7"><p class="cl-5e09806e"><span class="cl-5e09597d">Desulfobacterota</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.8739560</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.000363131</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.00000000000000000000000000000000000000000000000000000002476391</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.00000000000000000000000000000000000002378936148474884105553928126397522646584548056125640869140625000000000000000000000000000</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.788202948</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.77481355</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.0000000000000000000000000000000000000832627651966209436987242931138553103664889931678771972656250000000000000000000000000000</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.78820295</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.9327213</span></p></td><td class="cl-5e09a7c7"><p class="cl-5e09806e"><span class="cl-5e09597d"> a </span></p></td><td class="cl-5e09a7c7"><p class="cl-5e09806e"><span class="cl-5e09597d">  b</span></p></td><td class="cl-5e09a7c7"><p class="cl-5e09806e"><span class="cl-5e09597d"> a </span></p></td><td class="cl-5e09a7c7"><p class="cl-5e09806e"><span class="cl-5e09597d">  b</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-5e09a7c7"><p class="cl-5e09806e"><span class="cl-5e09597d">Firm_bact_ratio</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.8906106</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.001030726</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.00000000000000000000000131007350652692132269520192133782643396</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.00000000000000000000054229034510238992173453143053052372124511748552322387695312500000000000000000000000000000000000000000000</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.562779218</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.71514116</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.0000000000000000000012653441385722432448732513443623304283391917124390602111816406250000000000000000000000000000000000000000</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.76029631</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.9327213</span></p></td><td class="cl-5e09a7c7"><p class="cl-5e09806e"><span class="cl-5e09597d">  b</span></p></td><td class="cl-5e09a7c7"><p class="cl-5e09806e"><span class="cl-5e09597d"> a </span></p></td><td class="cl-5e09a7c7"><p class="cl-5e09806e"><span class="cl-5e09597d">  b</span></p></td><td class="cl-5e09a7c7"><p class="cl-5e09806e"><span class="cl-5e09597d"> a </span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-5e09a7c7"><p class="cl-5e09806e"><span class="cl-5e09597d">Firmicutes</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.9412748</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.038182335</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.00000000000000000000000000000000000000000000000000000000000000</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.00000000000002222629961970089308492468105349360030231764540076255798339843750000000000000000000000000000000000000000000000000</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.253949991</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.26350132</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.0000000000000388960243344765629024128994473130660480819642543792724609375000000000000000000000000000000000000000000000000000</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.67519214</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.9222546</span></p></td><td class="cl-5e09a7c7"><p class="cl-5e09806e"><span class="cl-5e09597d">  b d</span></p></td><td class="cl-5e09a7c7"><p class="cl-5e09806e"><span class="cl-5e09597d"> a c </span></p></td><td class="cl-5e09a7c7"><p class="cl-5e09806e"><span class="cl-5e09597d">   cd</span></p></td><td class="cl-5e09a7c7"><p class="cl-5e09806e"><span class="cl-5e09597d"> ab  </span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-5e09a7c7"><p class="cl-5e09806e"><span class="cl-5e09597d">Fusobacteriota</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.9576528</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.139160797</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.00000124096039370785385250531285272757031634682789444923400879</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.09449897307316433570090197235913365148007869720458984375000000000000000000000000000000000000000000000000000000000000000000000</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.001692239</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.03018468</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.1322985623024300616545900766141130588948726654052734375000000000000000000000000000000000000000000000000000000000000000000000</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.01184567</span></p></td><td class="cl-5e09a7c6"><p class="cl-5e09806f"><span class="cl-5e09597d">0.2112927</span></p></td><td class="cl-5e09a7c7"><p class="cl-5e09806e"><span class="cl-5e09597d"> a </span></p></td><td class="cl-5e09a7c7"><p class="cl-5e09806e"><span class="cl-5e09597d"> a </span></p></td><td class="cl-5e09a7c7"><p class="cl-5e09806e"><span class="cl-5e09597d"> a </span></p></td><td class="cl-5e09a7c7"><p class="cl-5e09806e"><span class="cl-5e09597d">  b</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-5e09a7c9"><p class="cl-5e09806e"><span class="cl-5e09597d">Proteobacteria</span></p></td><td class="cl-5e09a7c8"><p class="cl-5e09806f"><span class="cl-5e09597d">0.9227740</span></p></td><td class="cl-5e09a7c8"><p class="cl-5e09806f"><span class="cl-5e09597d">0.009424171</span></p></td><td class="cl-5e09a7c8"><p class="cl-5e09806f"><span class="cl-5e09597d">0.00000000000000000700563748427384378998986069753129868331598118</span></p></td><td class="cl-5e09a7c8"><p class="cl-5e09806f"><span class="cl-5e09597d">0.98119381518447545964534128870582208037376403808593750000000000000000000000000000000000000000000000000000000000000000000000000</span></p></td><td class="cl-5e09a7c8"><p class="cl-5e09806f"><span class="cl-5e09597d">0.651682555</span></p></td><td class="cl-5e09a7c8"><p class="cl-5e09806f"><span class="cl-5e09597d">0.97875682</span></p></td><td class="cl-5e09a7c8"><p class="cl-5e09806f"><span class="cl-5e09597d">0.9811938151844754596453412887058220803737640380859375000000000000000000000000000000000000000000000000000000000000000000000000</span></p></td><td class="cl-5e09a7c8"><p class="cl-5e09806f"><span class="cl-5e09597d">0.76029631</span></p></td><td class="cl-5e09a7c8"><p class="cl-5e09806f"><span class="cl-5e09597d">0.9787568</span></p></td><td class="cl-5e09a7c9"><p class="cl-5e09806e"><span class="cl-5e09597d"> a</span></p></td><td class="cl-5e09a7c9"><p class="cl-5e09806e"><span class="cl-5e09597d"> a</span></p></td><td class="cl-5e09a7c9"><p class="cl-5e09806e"><span class="cl-5e09597d"> a</span></p></td><td class="cl-5e09a7c9"><p class="cl-5e09806e"><span class="cl-5e09597d"> a</span></p></td></tr></tbody></table></div></template>
-<div class="flextable-shadow-host" id="53a826ce-f3b6-466a-a53f-f522dfaa5b06"></div>
-<script>
-var dest = document.getElementById("53a826ce-f3b6-466a-a53f-f522dfaa5b06");
-var template = document.getElementById("29492e1f-45c8-474d-8dca-a75bfb9b101d");
-var caption = template.content.querySelector("caption");
-if(caption) {
-  caption.style.cssText = "display:block;text-align:center;";
-  var newcapt = document.createElement("p");
-  newcapt.appendChild(caption)
-  dest.parentNode.insertBefore(newcapt, dest.previousSibling);
-}
-var fantome = dest.attachShadow({mode: 'open'});
-var templateContent = template.content;
-fantome.appendChild(templateContent);
-</script>
-
-```
 
 **Save in excel sheet**
 
 
 ```r
-write.xlsx(full_result,
-           file = "result_table.xlsx",
-           sheetName = "Stat model")
+full_result
 ```
 
 ## **Remarque**
@@ -1062,62 +999,62 @@ sessionInfo()
 ```
 
 ```
-## R version 4.1.2 (2021-11-01)
-## Platform: x86_64-w64-mingw32/x64 (64-bit)
-## Running under: Windows 10 x64 (build 19043)
+## R version 3.6.3 (2020-02-29)
+## Platform: x86_64-pc-linux-gnu (64-bit)
+## Running under: Ubuntu 20.04.3 LTS
 ## 
 ## Matrix products: default
+## BLAS:   /usr/lib/x86_64-linux-gnu/blas/libblas.so.3.9.0
+## LAPACK: /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3.9.0
 ## 
 ## locale:
-## [1] LC_COLLATE=French_France.1252  LC_CTYPE=French_France.1252   
-## [3] LC_MONETARY=French_France.1252 LC_NUMERIC=C                  
-## [5] LC_TIME=French_France.1252    
+##  [1] LC_CTYPE=fr_FR.UTF-8       LC_NUMERIC=C              
+##  [3] LC_TIME=fr_FR.UTF-8        LC_COLLATE=fr_FR.UTF-8    
+##  [5] LC_MONETARY=fr_FR.UTF-8    LC_MESSAGES=fr_FR.UTF-8   
+##  [7] LC_PAPER=fr_FR.UTF-8       LC_NAME=C                 
+##  [9] LC_ADDRESS=C               LC_TELEPHONE=C            
+## [11] LC_MEASUREMENT=fr_FR.UTF-8 LC_IDENTIFICATION=C       
 ## 
 ## attached base packages:
 ## [1] stats     graphics  grDevices utils     datasets  methods   base     
 ## 
 ## other attached packages:
-##  [1] xlsx_0.6.5        flextable_0.6.10  DT_0.20           emmeans_1.7.2    
-##  [5] lmerTest_3.1-3    lme4_1.1-27.1     Matrix_1.4-1      multcomp_1.4-19  
-##  [9] TH.data_1.1-0     MASS_7.3-54       survival_3.2-13   mvtnorm_1.1-3    
-## [13] car_3.0-12        carData_3.0-5     phyloseq_1.36.0   broom.mixed_0.2.7
-## [17] broom_0.7.11      purrr_0.3.4       tidyr_1.1.4       dplyr_1.0.7      
-## [21] tibble_3.1.6     
+##  [1] ggplot2_3.3.5     DT_0.20           emmeans_1.7.2     lmerTest_3.1-3   
+##  [5] lme4_1.1-28       Matrix_1.2-18     multcomp_1.4-18   TH.data_1.1-0    
+##  [9] MASS_7.3-51.5     survival_3.1-8    mvtnorm_1.1-3     car_3.0-12       
+## [13] carData_3.0-5     phyloseq_1.30.0   broom.mixed_0.2.7 broom_0.7.12     
+## [17] purrr_0.3.4       tidyr_1.2.0       dplyr_1.0.8       tibble_3.1.6     
 ## 
 ## loaded via a namespace (and not attached):
-##  [1] minqa_1.2.4            colorspace_2.0-2       ellipsis_0.3.2        
-##  [4] estimability_1.3       XVector_0.32.0         base64enc_0.1-3       
-##  [7] rstudioapi_0.13        fansi_0.5.0            xml2_1.3.3            
-## [10] codetools_0.2-18       splines_4.1.2          knitr_1.37            
-## [13] ade4_1.7-18            jsonlite_1.7.2         nloptr_1.2.2.3        
-## [16] pbkrtest_0.5.1         rJava_1.0-6            cluster_2.1.2         
-## [19] compiler_4.1.2         backports_1.4.1        assertthat_0.2.1      
-## [22] fastmap_1.1.0          cli_3.1.0              htmltools_0.5.2       
-## [25] tools_4.1.2            igraph_1.2.11          coda_0.19-4           
-## [28] gtable_0.3.0           glue_1.6.0             GenomeInfoDbData_1.2.6
-## [31] reshape2_1.4.4         Rcpp_1.0.7             Biobase_2.52.0        
-## [34] jquerylib_0.1.4        vctrs_0.3.8            Biostrings_2.60.2     
-## [37] rhdf5filters_1.4.0     multtest_2.48.0        ape_5.6-1             
-## [40] nlme_3.1-153           iterators_1.0.13       crosstalk_1.2.0       
-## [43] xfun_0.29              stringr_1.4.0          xlsxjars_0.6.1        
-## [46] lifecycle_1.0.1        zlibbioc_1.38.0        zoo_1.8-10            
-## [49] scales_1.1.1           parallel_4.1.2         biomformat_1.20.0     
-## [52] sandwich_3.0-2         rhdf5_2.36.0           yaml_2.2.1            
-## [55] ggplot2_3.3.5          gdtools_0.2.3          sass_0.4.0            
-## [58] stringi_1.7.6          S4Vectors_0.30.2       foreach_1.5.1         
-## [61] permute_0.9-5          BiocGenerics_0.38.0    boot_1.3-28           
-## [64] zip_2.2.0              GenomeInfoDb_1.28.4    rlang_0.4.12          
-## [67] pkgconfig_2.0.3        systemfonts_1.0.3      bitops_1.0-7          
-## [70] evaluate_0.14          lattice_0.20-45        Rhdf5lib_1.14.2       
-## [73] htmlwidgets_1.5.4      tidyselect_1.1.1       plyr_1.8.6            
-## [76] magrittr_2.0.1         R6_2.5.1               multcompView_0.1-8    
-## [79] IRanges_2.26.0         generics_0.1.1         DBI_1.1.2             
-## [82] pillar_1.6.4           mgcv_1.8-38            abind_1.4-7           
-## [85] RCurl_1.98-1.5         crayon_1.4.2           uuid_1.0-3            
-## [88] utf8_1.2.2             rmarkdown_2.11         officer_0.4.1         
-## [91] grid_4.1.2             data.table_1.14.2      vegan_2.5-7           
-## [94] digest_0.6.29          xtable_1.8-6           numDeriv_2020.2-1     
-## [97] stats4_4.1.2           munsell_0.5.0          bslib_0.3.1
+##  [1] nlme_3.1-144        pbkrtest_0.5.1      numDeriv_2016.8-1.1
+##  [4] tools_3.6.3         backports_1.4.1     bslib_0.3.1        
+##  [7] utf8_1.2.2          R6_2.5.1            vegan_2.5-7        
+## [10] DBI_1.1.2           BiocGenerics_0.32.0 mgcv_1.8-31        
+## [13] colorspace_2.0-2    permute_0.9-7       ade4_1.7-18        
+## [16] withr_2.4.3         tidyselect_1.1.1    compiler_3.6.3     
+## [19] cli_3.2.0           Biobase_2.46.0      sandwich_3.0-1     
+## [22] sass_0.4.0          scales_1.1.1        multcompView_0.1-8 
+## [25] stringr_1.4.0       digest_0.6.29       minqa_1.2.4        
+## [28] rmarkdown_2.11      XVector_0.26.0      pkgconfig_2.0.3    
+## [31] htmltools_0.5.2     fastmap_1.1.0       htmlwidgets_1.5.4  
+## [34] rlang_1.0.1         rstudioapi_0.13     jquerylib_0.1.4    
+## [37] generics_0.1.2      zoo_1.8-9           jsonlite_1.7.3     
+## [40] crosstalk_1.2.0     magrittr_2.0.2      biomformat_1.14.0  
+## [43] Rcpp_1.0.8          munsell_0.5.0       S4Vectors_0.24.4   
+## [46] Rhdf5lib_1.8.0      fansi_1.0.2         ape_5.6-1          
+## [49] abind_1.4-5         lifecycle_1.0.1     stringi_1.7.6      
+## [52] yaml_2.2.2          zlibbioc_1.32.0     rhdf5_2.30.1       
+## [55] plyr_1.8.6          grid_3.6.3          parallel_3.6.3     
+## [58] crayon_1.5.0        lattice_0.20-40     Biostrings_2.54.0  
+## [61] splines_3.6.3       multtest_2.42.0     knitr_1.37         
+## [64] pillar_1.7.0        igraph_1.2.11       boot_1.3-24        
+## [67] estimability_1.3    reshape2_1.4.4      codetools_0.2-16   
+## [70] stats4_3.6.3        glue_1.6.1          evaluate_0.14      
+## [73] data.table_1.14.2   vctrs_0.3.8         nloptr_2.0.0       
+## [76] foreach_1.5.2       gtable_0.3.0        assertthat_0.2.1   
+## [79] xfun_0.29           xtable_1.8-4        coda_0.19-4        
+## [82] iterators_1.0.14    IRanges_2.20.2      cluster_2.1.0      
+## [85] ellipsis_0.3.2
 ```
 
 

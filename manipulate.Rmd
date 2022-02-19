@@ -1,0 +1,235 @@
+---
+title: "Manipulation des données"
+author: "Vincent Darbot"
+date: "15/02/2022"
+output: 
+  html_document: 
+    code_folding: show
+    toc: yes
+    toc_float: yes
+    keep_md: TRUE
+---
+
+```{css, echo=FALSE}
+.spoiler {
+  visibility: hidden;
+}
+
+.spoiler::before {
+  visibility: visible;
+  content: "Survoler pour voir la réponse."
+}
+
+.spoiler:hover {
+  visibility: visible;
+}
+
+.spoiler:hover::before {
+  display: none;
+}
+```
+```{r, warning = FALSE, message = FALSE}
+library(ggplot2)
+library(tibble)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(readr)
+```
+
+## **Tidyverse**
+
+Le terme tidyverse est une contraction de tidy (qu’on pourrait traduire par “bien rangé”) et de universe. Il s’agit en fait d’une collection d’extensions conçues pour travailler ensemble et basées sur une philosophie commune.
+
+Elles abordent un très grand nombre d’opérations courantes dans R (la liste n’est pas exhaustive) :
+
+ - visualisation
+ - manipulation des tableaux de données
+ - import/export de données
+ - manipulation de variables
+ - extraction de données du Web
+ - programmation
+ 
+Les principes d’un jeu de données tidy sont les suivants :
+
+chaque variable est une colonne
+chaque observation est une ligne
+chaque type d’observation est dans une table différente
+
+## **Tibble**
+
+Les principes d’un jeu de données tidy sont les suivants :
+
+ - chaque variable est une colonne
+ - chaque observation est une ligne
+ - chaque type d’observation est dans une table différente
+
+```{r}
+otu_tab <-  read.table("data/otu_table.tsv", header = TRUE, sep = "\t")
+otu_tab <- as_tibble(rownames_to_column(otu_tab, var = 'Cluster'))
+otu_tab
+```
+
+Contrairement aux data frames, les tibbles :
+
+ - n’ont pas de noms de lignes (rownames).<br>
+ On utilise la fonction `rownames_to_column` pour convertir les noms de lignes en première colonne
+ - autorisent des noms de colonnes invalides pour les data frames (espaces, caractères spéciaux, nombres…) 
+ - s’affichent plus intelligemment que les data frames : seules les premières lignes sont affichées, ainsi que quelques informations supplémentaires utiles (dimensions, types des colonnes…)
+ - ne font pas de partial matching sur les noms de colonnes 
+ - affichent un avertissement si on essaie d’accéder à une colonne qui n’existe pas
+
+On peut à l'inverse convertir un tibble en data.frame 
+, en convertissant la colonne *rowname* en "vrais" rownames avec `column_to_rownames`
+
+```{r}
+data_frame_otu_tab <- column_to_rownames(as.data.frame(otu_tab), var='Cluster')
+data_frame_otu_tab[c(1:4),c(1:4)]
+```
+
+## **Les objets de base de R**
+
+### **Les vecteurs**
+
+Dans R, il existe quatre types fondamentaux de vecteurs :
+
+ - les nombres réels (c’est-à-dire les nombres décimaux que nous utilisons au quotidien),
+ - les nombres entiers,
+ - les chaînes de caractères (qui correspondent à du texte) et
+ - les valeurs logiques ou valeurs booléennes, à savoir vrai ou faux.
+ 
+Pour connaître la nature d’un objet, le plus simple est d’utiliser la fonction `class`.
+
+```{r}
+class(12.5)
+class(TRUE)
+class('abc')
+```
+les valeurs logiques s’indiquent avec TRUE pour vrai et FALSE pour faux. Il est aussi possible d’utiliser les raccourcis T et F. Attention à bien utiliser les majuscules, R étant sensible à la casse.
+<br>
+<br>
+
+#### **Fonctions sur les vecteurs**
+
+La fonction `c` permet de combiner des valeurs individuelles dans un vecteur unique, en lui passant la liste des valeurs à combiner :
+
+```{r}
+taille <- c(1.88, 1.65, 1.92, 1.3)
+taille
+```
+Attention, si on essaie de combiner des valeurs de différents type, R essaiera de les cobvertir au mieux : 
+
+```{r}
+vecteur <- c(3,8,5,"abc")
+vecteur
+```
+<br>
+
+La fonction `rep` permet de **répéter** des valeurs identiques : 
+
+```{r}
+rep(2, 10)
+```
+On peut combiner la fonction `c` et la fonction `rep` pour répéter plusieurs valeurs à répéter en boucle :
+
+```{r}
+rep(c("a", "b"), 3)
+```
+<br>
+
+La fonction `seq` permet de créer des **suites** de valeurs. Le 1er argument de la fonction indique le point de départ (*from*), le 2ème argument le point d'arrivée (*to*), le 3ème argument le pas (*by*).
+
+```{r}
+seq(1,10)
+
+seq(5,18,2)
+
+seq(100, 0, -10)
+```
+<br>
+
+**L'opérateur `:`**
+
+L'opérateur `:` est un raccourci de la fonction `seq` pour créer une suite de nombre entiers :
+
+```{r}
+1:8
+```
+
+La fonction `length` permet d'accéder au nombre de valeurs qui le composent :
+
+```{r}
+vecteur <- c(3, 8, 9, 10)
+length(vecteur)
+```
+<br>
+
+On peut **combiner des vecteurs** en utilisant encore la fonction `c` :
+```{r}
+x <- c(1,2,3)
+y <- c(4,5,6)
+c(x,y)
+```
+<br>
+
+**Valeurs manquantes**
+
+Lorsqu’on travaille avec des données, il est fréquent que certaines données soient manquantes. Une valeur manquante s’indique sous R avec `NA` (pour not available). Cette valeur peut s’appliquer à n’importe quel type de vecteur, qu’il soit numérique, textuel ou logique.
+
+```{r}
+taille <- c(3, 8, NA, 2, NA)
+mean(taille)
+mean(taille, na.rm = TRUE)
+```
+le paramètre `na.rm`permet de ne pas prendre en compte les valeurs manquantes lors des calcules statistiques.
+
+Il est important de ne pas confondre `NA` et `NULL` qui ce dernier représente un objet vide, NULL ne contient absolument rien, tandis que NA contient l'absence d'une information.
+
+<br>
+
+**L'indexation**
+
+L’indexation est l’une des fonctionnalités les plus puissantes mais aussi les plus difficiles à maîtriser de R. Il s’agit d’opérations permettant de sélectionner des sous-ensembles de valeurs en fonction de différents critères.
+
+ 1. **L'indexation par position**
+ 
+```{r, echo=FALSE}
+taille <- c(1.56, 1.89, 1.65, NA, 1.70, NA, 1.70)
+```
+Si on souhaite le premier élément du vecteur, on peut faire :
+
+```{r}
+taille[1]
+```
+
+Si on souhaite les trois premiers éléments ou les éléments 2, 4 et 6 :
+
+```{r}
+taille[1:3]
+taille[c(2, 4, 6)]
+```
+Si on veut le dernier élément :
+
+```{r}
+taille[length(taille)]
+```
+ 2. **L'indexation par nom**
+ 
+ **Nommage des vecteurs**
+ 
+Les différentes valeurs d’un vecteur peuvent être nommées. Une première manière de nommer les éléments d’un vecteur est de le faire à sa création :
+
+```{r}
+sexe <- c(Michel = "h", Anne = "f", Dominique = NA, Jean = "h", Claude = NA, Marie = "f")
+sexe
+```
+```{r}
+names(sexe)
+```
+Lorsqu’un vecteur est nommé, il est dès lors possible d’accéder à ses valeurs à partir de leur nom. Il s’agit de l’indexation par nom.
+
+```{r}
+sexe["Anne"]
+```
+
+
