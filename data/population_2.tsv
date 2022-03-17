@@ -1,0 +1,13 @@
+country	continent	year	variable	value
+Belgium	Europe	2002	lifeExp	78.320
+Belgium	Europe	2007	lifeExp	79.441
+France	Europe	2002	lifeExp	79.590
+France	Europe	2007	lifeExp	80.657
+Germany	Europe	2002	lifeExp	78.670
+Germany	Europe	2007	lifeExp	79.406
+Belgium	Europe	2002	pop	10311970.000
+Belgium	Europe	2007	pop	10392226.000
+France	Europe	2002	pop	59925035.000
+France	Europe	2007	pop	61083916.000
+Germany	Europe	2002	pop	82350671.000
+Germany	Europe	2007	pop	82400996.000

@@ -1,5 +1,5 @@
 ---
-title: "Manipulation des données"
+title: "Introduction à R et manipulation des données"
 author: "Vincent Darbot"
 date: "15/02/2022"
 output: 
@@ -35,56 +35,94 @@ library(dplyr)
 library(tidyr)
 library(stringr)
 library(readr)
+library(questionr)
+library(nycflights13)
 ```
 
-## **Tidyverse**
+# **Prise en main**
 
-Le terme tidyverse est une contraction de tidy (qu’on pourrait traduire par “bien rangé”) et de universe. Il s’agit en fait d’une collection d’extensions conçues pour travailler ensemble et basées sur une philosophie commune.
+## **Organiser ses fichiers**
 
-Elles abordent un très grand nombre d’opérations courantes dans R (la liste n’est pas exhaustive) :
+À chaque fois que l’on demandera à R de charger ou d’enregistrer un fichier, R évaluera le nom du fichier qu’on lui a transmis par rapport au répertoire de travail actuellement défini, qui correspond au répertoire dans lequel R est actuellement en train de s’exécuter.
 
- - visualisation
- - manipulation des tableaux de données
- - import/export de données
- - manipulation de variables
- - extraction de données du Web
- - programmation
- 
-Les principes d’un jeu de données tidy sont les suivants :
-
-chaque variable est une colonne
-chaque observation est une ligne
-chaque type d’observation est dans une table différente
-
-## **Tibble**
-
-Les principes d’un jeu de données tidy sont les suivants :
-
- - chaque variable est une colonne
- - chaque observation est une ligne
- - chaque type d’observation est dans une table différente
+Pour connaître de le répertoire de travail actuel, on pourra utiliser la fonction getwd :
 
 ```{r}
-otu_tab <-  read.table("data/otu_table.tsv", header = TRUE, sep = "\t")
-otu_tab <- as_tibble(rownames_to_column(otu_tab, var = 'Cluster'))
-otu_tab
+getwd()
 ```
 
-Contrairement aux data frames, les tibbles :
+**Les projets dans RStudio**
 
- - n’ont pas de noms de lignes (rownames).<br>
- On utilise la fonction `rownames_to_column` pour convertir les noms de lignes en première colonne
- - autorisent des noms de colonnes invalides pour les data frames (espaces, caractères spéciaux, nombres…) 
- - s’affichent plus intelligemment que les data frames : seules les premières lignes sont affichées, ainsi que quelques informations supplémentaires utiles (dimensions, types des colonnes…)
- - ne font pas de partial matching sur les noms de colonnes 
- - affichent un avertissement si on essaie d’accéder à une colonne qui n’existe pas
+RStudio dispose d’une fonctionnalité très pratique pour organiser son travail en différents projets.
 
-On peut à l'inverse convertir un tibble en data.frame 
-, en convertissant la colonne *rowname* en "vrais" rownames avec `column_to_rownames`
+L’idée principale est de réunir tous les fichiers / documents relatifs à un même projet (que ce soit les données, les scripts, les rapports automatisés…) dans un répertoire dédié.
+
+Le menu Projects est accessible via une icône dédiée située tout en haut à droite.
+
+**Fonctionnement par défaut des projets**
+
+Lorsque l’on ouvre un projet, RStudio effectue différentes actions :
+
+- le nom du projet est affiché en haut à droite à côté de l’icône projets ;
+- une nouvelle session R est exécutée (ainsi s’il on passe d’un projet à un autre, les objets du projet qu’on vient de fermer ne sont plus en mémoire) ;
+- le répertoire de travail de R est défini comme étant le répertoire du projet (d’où le fait que l’on n’a pas à se préoccuper de définir le répertoire de travail lorsque l’on travaille avec des projets RStudio) ;
+- les objets créés (et sauvegardés dans le fichier .Rdata) lors d’une précédente séance de travail sont chargés en mémoire ;
+- l’historique des commandes saisies lors de nos précédentes séances de travail sont chargées dans l’onglet History ;
+- les scripts ouverts lors d’une précédente séance de travail sont automatiquement ouverts ;
+- divers paramètres de RStudio sont restaurés dans l’état dans lequel ils étaient la dernière fois que l’on a travaillé sur ce projet.
+
+**Appeler un script depuis un autre script**
+
+Il est possible d’appeler un script au sein d’un autre script à l’aide de la fonction `source` à laquelle on précisera le nom de fichier du script en question.
+
+Ainsi, la fonction " random nb " du script exemple_source.R peut-être appelé de cette manière :
 
 ```{r}
-data_frame_otu_tab <- column_to_rownames(as.data.frame(otu_tab), var='Cluster')
-data_frame_otu_tab[c(1:4),c(1:4)]
+source('bin/exemple_source.R')
+random_nb(100)
+```
+
+## **Import des données**
+
+**Importer des fichiers texte**
+
+Il existe une grande variétés de format texte, qui peuvent prendre différents noms selon les outils, tels que texte tabulé ou texte (séparateur : tabulation), CSV (pour comma-separated value, sachant que suivant les logiciels le séparateur peut être une virgule ou un point-virgule).
+
+Dès lors, avant d’importer un fichier texte dans R, il est indispensable de regarder comment ce dernier est structuré. Il importe de prendre note des éléments suivants :
+
+- La première ligne contient-elle le nom des variables ? Ici c’est le cas.
+- Quel est le caractère séparateur entre les différentes variables (encore appelé séparateur de champs) ? Dans le cadre d’un fichier CSV, il aurait pu s’agir d’une virgule ou d’un point-virgule.
+- Quel est le caractère utilisé pour indiquer les décimales (le séparateur décimal) ? Il s’agit en général d’un point (à l’anglo-saxonne) ou d’une virgule (à la française).
+- Les valeurs textuelles sont-elles encadrées par des guillemets et, si oui, s’agit-il de guillements simple (') ou de guillemets doubles (") ?
+- Pour les variables textuelles, y a-t-il des valeurs manquantes et si oui comment sont-elles indiquées ? Par exemple, le texte NA est parfois utilisé.
+
+Il ne faut pas hésitez à ouvrir le fichier avec un éditeur de texte pour le regarder de plus près.
+
+Un exemple de fichier à importer se situe dans " dat/import_file.txt "
+
+**Import dans un script**
+
+RStudio fait appel à l’extension readr du tidyverse pour l’import des données via la fonction read_csv.
+
+readr essaie de deviner le type de chacune des colonnes, en se basant sur les premières observations. En cliquant sur le nom d’une colonne, il est possible de modifier le type de la variable importée. Il est également possible d’exclure une colonne de l’import (skip).
+
+```{r}
+library(readr)
+d <- read_delim("data/import_file.txt",
+  delim = "\t", quote = "'"
+)
+d
+```
+
+L’objet renvoyé est un tableau de données ou data.frame. Plus précisément, il s’agit d’un **tibble**, c’est-à-dire un tableau de données légèrement amélioré facilement utilisable avec les différentes extensions du tidyverse.
+
+**Import depuis Excel**
+
+La fonction read_excel permet d’importer à la fois des fichiers .xls (Excel 2003 et précédents) et .xlsx (Excel 2007 et suivants).
+
+```{r}
+library(readxl)
+# donnees <- read_excel("data/fichier.xlsx")
 ```
 
 ## **Les objets de base de R**
@@ -108,6 +146,14 @@ class('abc')
 les valeurs logiques s’indiquent avec TRUE pour vrai et FALSE pour faux. Il est aussi possible d’utiliser les raccourcis T et F. Attention à bien utiliser les majuscules, R étant sensible à la casse.
 <br>
 <br>
+
+**Export des données**
+
+On peut avoir besoin d’exporter un tableau de données dans R vers un fichier dans différents formats. La plupart des fonctions d’import disposent d’un équivalent permettant l’export de données. On utilisera principalement :
+
+write_csv, write_delim, write_tsv (readr)permettent d’enregistrer un data frame ou un tibble dans un fichier au format texte délimité.
+
+
 
 #### **Fonctions sur les vecteurs**
 
@@ -232,4 +278,782 @@ Lorsqu’un vecteur est nommé, il est dès lors possible d’accéder à ses va
 sexe["Anne"]
 ```
 
+
+```{r}
+sexe[names(sexe) != "Dominique"]
+```
+pour sélectionner tous les éléments sauf celui qui s’appelle Dom.
+
+  3. **L'indexation par condition**
+
+```{r}
+poids <- c(80, 63, 75, 87, 82, 67, 50)
+```
+
+Supposons qu’on souhaite maintenant avoir la taille des individus pesant 80 kilogrammes ou plus. Nous pouvons effectuer une comparaison à l’aide des opérateurs de comparaison suivants :
+
+Opérateur de comparaison	Signification
+<br>
+==	égal à 
+<br>
+!=	différent de
+<br>
+>	strictement supérieur à
+<br>
+<	strictement inférieur à
+<br>
+>=	supérieur ou égal à
+<br>
+<=	inférieur ou égal à
+<br>
+
+```{r}
+poids >= 80
+```
+
+Nous avons fourni à R une condition et il nous a renvoyé un vecteur logique avec autant d’éléments qu’il y a d’observations et dont la valeur est TRUE si la condition est remplie et FALSE dans les autres cas. Nous pouvons alors utiliser ce vecteur logique pour obtenir la taille des participants pesant 80 kilogrammes ou plus :
+
+```{r}
+taille[poids >= 80]
+```
+
+** Assignation par l'indexation **
+
+Dans tous les exemples précédents, on a utilisé l’indexation pour extraire une partie d’un vecteur, en plaçant l’opération d’indexation à droite de l’opérateur <-.
+
+Mais l’indexation peut également être placée à gauche de cet opérateur d’assignation. Dans ce cas, les éléments sélectionnés par l’indexation sont alors remplacés par les valeurs indiquées à droite de l’opérateur <-.
+Exemple:
+
+```{r}
+sexe["Alex"] <- "f"
+sexe
+```
+
+```{r}
+sexe[c(1, 3, 4)] <- c("Homme", "Homme", "Homme")
+sexe[c(1, 3, 4)] <- "Homme"
+sexe
+```
+
+
+### **Les Listes et Tableaux de données**
+
+**Listes**
+
+Comparer aux vecteurs qui ne peuvent contenir que des valeurs de même type (numérique par exemple), les listes peuvent représenter des objets plus complexes.
+
+```{r}
+l1 <- list(1:5, "abc")
+```
+
+On peut aussi créer une liste de listes grâce à la fonction append:
+
+```{r}
+l2 <- list(minuscules = letters, majuscules = LETTERS, mois = month.name)
+
+l <- append(l1, l2)
+l
+```
+
+On peut utiliser le dollar pour accéder à un élément d'une liste:
+
+```{r}
+l$mois
+```
+
+**Tableaux de données**
+
+Dans R, les tableaux de données sont tout simplement des listes avec quelques propriétés spécifiques :
+
+- les tableaux de données ne peuvent contenir que des vecteurs ;
+- tous les vecteurs d’un tableau de données ont la même longueur ;
+- tous les éléments d’un tableau de données sont nommés et ont chacun un nom unique.
+
+```{r}
+df <- data.frame(
+  sexe = c("f", "f", "h", "h"),
+  age = c(52, 31, 29, 35),
+  blond = c(FALSE, TRUE, TRUE, FALSE)
+)
+df
+```
+
+Nombre de lignes et de colonnes du tableau:
+```{r}
+nrow(df)
+
+ncol(df)
+```
+
+On va souvent avoir besoin de nommer les lignes du tableau :
+
+```{r}
+row.names(df) <- c("Anna", "Mary-Ann", "Michael", "John")
+```
+
+Pour extraire la première colonne du tableau, on utilisera les crochets, ou le dollar vu précédemment :
+
+```{r}
+df[1]
+df["sexe"]
+```
+
+Pour extraire à la fois sur les lignes, et les colonnes, on utilise les crochets simples ([]) en séparant nos deux critères par une virgule (,) :
+
+```{r}
+df[3, 2]
+df["Michael", "age"]
+```
+
+Pour filter sur 2 lignes, et garder toutes les colonnes :
+
+```{r}
+df[1:2, ]
+```
+
+Pour accéder aux deux dernières lignes d'un tableau :
+
+```{r}
+tail(df, 2)
+```
+
+Pour avoir quelques statistiques de base sur le tableau :
+```{r}
+summary(df)
+```
+
+### **Les facteurs**
+
+Les facteurs (ou factors an anglais) sont un type de vecteur géré nativement par R et utilisés dans de nombreux domaines (modèles statistiques, représentations graphiques, …).
+
+On charge le jeu de données hdv2003 (package questionr) , on constate que certaines variables correspondent à des facteurs 
+```{r}
+library(questionr)
+data(hdv2003)
+d <- hdv2003
+str(d)
+```
+
+Les facteurs prennent leurs valeurs dans un ensemble de modalités prédéfinies et ne peuvent en prendre d’autres. La liste des valinstaeurs possibles est donnée par la fonction levels :
+
+```{r}
+levels(d$sexe)
+```
+
+Si on veut modifier la valeur du sexe du premier individu de notre tableau de données avec une valeur non autorisée, on obient un message d’erreur et une valeur manquante est utilisée à la place :
+
+```{r}
+d$sexe[1] <- "Chihuahua"
+```
+
+On peut très facilement créer un facteur à partir d’une variable textuelle avec la fonction factor :
+
+```{r}
+v <- factor(c("H", "H", "F", "H"))
+v
+```
+
+
+## **Tidyverse**
+
+Le terme tidyverse est une contraction de tidy (qu’on pourrait traduire par “bien rangé”) et de universe. Il s’agit en fait d’une collection d’extensions conçues pour travailler ensemble et basées sur une philosophie commune.
+
+Elles abordent un très grand nombre d’opérations courantes dans R (la liste n’est pas exhaustive) :
+
+ - visualisation
+ - manipulation des tableaux de données
+ - import/export de données
+ - manipulation de variables
+ - extraction de données du Web
+ - programmation
+ 
+Les principes d’un jeu de données tidy sont les suivants :
+
+chaque variable est une colonne
+chaque observation est une ligne
+chaque type d’observation est dans une table différente
+
+## **Tibble**
+
+Les principes d’un jeu de données tidy sont les suivants :
+
+ - chaque variable est une colonne
+ - chaque observation est une ligne
+ - chaque type d’observation est dans une table différente
+
+```{r}
+otu_tab <-  read.table("data/otu_table.tsv", header = TRUE, sep = "\t")
+otu_tab <- as_tibble(rownames_to_column(otu_tab, var = 'Cluster'))
+otu_tab
+```
+
+Contrairement aux data frames, les tibbles :
+
+ - n’ont pas de noms de lignes (rownames).<br>
+ On utilise la fonction `rownames_to_column` pour convertir les noms de lignes en première colonne
+ - autorisent des noms de colonnes invalides pour les data frames (espaces, caractères spéciaux, nombres…) 
+ - s’affichent plus intelligemment que les data frames : seules les premières lignes sont affichées, ainsi que quelques informations supplémentaires utiles (dimensions, types des colonnes…)
+ - ne font pas de partial matching sur les noms de colonnes 
+ - affichent un avertissement si on essaie d’accéder à une colonne qui n’existe pas
+
+On peut à l'inverse convertir un tibble en data.frame 
+, en convertissant la colonne *rowname* en "vrais" rownames avec `column_to_rownames`
+
+```{r}
+data_frame_otu_tab <- column_to_rownames(as.data.frame(otu_tab), var='Cluster')
+data_frame_otu_tab[c(1:4),c(1:4)]
+```
+
+
+# **Manipulation des données**
+
+## **Visualistion et recodage de variables**
+
+R propose une interface permettant de visualiser le contenu d’un tableau de données à l’aide de la fonction View :
+
+
+```{r}
+metadata <- read_delim('data/metadata.tsv', delim = '\t')
+```
+
+
+Ajout d'une colonne Profondeur et une colonne  (juste pour avoir une colonne avec des numériques) :
+
+```{r}
+hundredths <- seq(from=0, to=100, by=0.1)
+profondeurs <- sample(hundredths, size=145, replace=TRUE)
+metadata$Temps <- as.factor(metadata$Temps)
+metadata$Profondeur <- profondeurs
+
+```
+
+```{r}
+library(dplyr)
+rename(metadata, Time = Temps)
+```
+
+**Découper une variable numérique en classes**
+
+cut permet ici de découper les valeurs de prondeurs en 3 intervalles (0-30, 30-70, 70-100), en zones Profonde, Moyenne et Basse (désignés par Labels)
+```{r}
+metadata$Zones <- cut(metadata$Profondeur, c(0,30,70,100), labels = c("Surface","Moyenne","Profonde"), include.lowest=TRUE)
+metadata
+```
+
+**Variables calculées**
+
+La création d’une variable numérique à partir de calculs sur une ou plusieurs autres variables numériques se fait très simplement.
+
+Supposons que l’on souhaite calculer une variable indiquant l’écart entre la profondeur et la moyenne globale de cette variable. On pourrait alors faire :
+
+```{r}
+metadata$Ecart.profondeur <- metadata$Profondeur - mean(metadata$Profondeur, na.rm = TRUE)
+```
+
+**Combiner plusieurs variables**
+
+On peut ainsi vouloir combiner plusieurs variables qualitatives en une seule.
+
+```{r}
+metadata$combinaison <- NA 
+metadata$combinaison[metadata$Prelevement == "Caeca" & metadata$Temps == "T0" ] <- "Caeca_Start"
+metadata$combinaison[metadata$Prelevement == "Jabot" & metadata$Temps == "T0" ] <- "Jabot_Start"
+metadata$combinaison[metadata$Prelevement == "Ileon" & metadata$Temps == "T0" ] <- "Ileon_Start"
+```
+
+## **Manipuler les données avec dplyr**
+
+**dplyr** est une extension facilitant le traitement et la manipulation de données contenues dans une ou plusieurs tables (qu’il s’agisse de data frame ou de tibble). Elle propose une syntaxe claire et cohérente, sous formes de verbes, pour la plupart des opérations de ce type.
+
+Par ailleurs, les fonctions de dplyr sont en général plus rapides que leur équivalent sous R de base, elles permettent donc de traiter des données de grande dimension.
+
+dplyr part du principe que les données sont tidy. Les fonctions de l’extension peuvent s’appliquer à des tableaux de type data.frame ou tibble, et elles retournent systématiquement un tibble.
+
+dplyr fait partie du coeur du tidyverse, elle est donc chargée automatiquement avec celle-ci.
+On charge aussi le jeu de données nycflights3.
+
+```{r}
+library(tidyverse)
+library(nycflights13)
+data(flights)
+data(airports)
+data(airlines)
+```
+
+Ces trois tableaux sont au format tibble. Il s’agit d’une extension des tableaux de données utilisé par le tidyverse.
+
+Pour convertir un tableau de données en tibble, on utilisera la fonction `as_tibble`.
+
+**Les verbes de dplyr**
+
+La manipulation de données avec dplyr se fait en utilisant un nombre réduit de verbes, qui correspondent chacun à une action différente appliquée à un tableau de données.
+
+- **Slice**
+
+Le verbe slice sélectionne des lignes du tableau selon leur position. On lui passe un chiffre ou un vecteur de chiffres.
+
+Si on veut sélectionner les 5 premières lignes :
+
+```{r}
+slice(airports, 1:5)
+```
+
+- Filter
+
+`filter` sélectionne des lignes d’un tableau de données selon une condition. On lui passe en paramètre un test, et seules les lignes pour lesquelles ce test renvoit TRUE (vrai) sont conservées.
+
+Par exemple, si on veut sélectionner les vols du mois de janvier, on peut filtrer sur la variable month de la manière suivante :
+
+```{r}
+filter(flights, month == 1)
+```
+
+Si on veut uniquement les vols avec un retard au départ (variable dep_delay) compris entre 10 et 15 minutes :
+
+```{r}
+filter(flights, dep_delay >= 10 & dep_delay <= 15)
+filter(flights, dep_delay >= 10, dep_delay <= 15)
+```
+
+Enfin, on peut également placer des fonctions dans les tests, qui nous permettent par exemple de sélectionner les vols avec la plus grande distance :
+
+```{r}
+filter(flights, distance == max(distance))
+```
+
+- **Select, rename et relocate**
+
+`select` permet de sélectionner des colonnes d’un tableau de données. Ainsi, si on veut extraire les colonnes lat et lon du tableau airports :
+
+```{r}
+select(airports, lat, lon)
+```
+
+Si on fait précéder le nom d’un -, la colonne est éliminée plutôt que sélectionnée :
+
+```{r}
+select(airports, -lat, -lon)
+```
+
+select comprend toute une série de fonctions facilitant la sélection de multiples colonnes. Par exemple, starts_with, ends_width, contains ou matches permettent d’exprimer des conditions sur les noms de variables :
+
+```{r}
+select(flights, starts_with("dep_"))
+```
+
+La syntaxe colonne1:colonne2 permet de sélectionner toutes les colonnes situées entre colonne1 et colonne2 incluses :
+
+```{r}
+select(flights, year:day)
+```
+
+`select` peut être utilisée pour réordonner les colonnes d’une table en utilisant la fonction `everything()`, qui sélectionne l’ensemble des colonnes non encore sélectionnées. Ainsi, si on souhaite faire passer la colonne name en première position de la table airports, on peut faire :
+
+```{r}
+select(airports, name, everything())
+```
+
+Pour réordonner des colonnes, on pourra aussi avoir recours à `relocate` en indiquant les premières variables. IL n’est pas nécessaire d’ajouter `everything()` car avec relocate toutes les variables sont conservées.
+
+```{r}
+relocate(airports, lon, lat, name)
+```
+
+- **arrange**
+
+`arrange` réordonne les lignes d’un tableau selon une ou plusieurs colonnes.
+
+Ainsi, si on veut trier le tableau flights selon le retard au départ croissant :
+
+```{r}
+dplyr::arrange(flights, dep_delay)
+```
+
+On peut trier selon plusieurs colonnes. Par exemple selon le mois, puis selon le retard au départ :
+
+```{r}
+dplyr::arrange(flights, month, dep_delay)
+```
+
+Si on veut trier selon une colonne par ordre décroissant, on lui applique la fonction `desc()`
+
+```{r}
+dplyr::arrange(flights, desc(dep_delay))
+```
+
+Combiné avec `slice`, `arrange permet par exemple de sélectionner les trois vols ayant eu le plus de retard :
+
+```{r}
+tmp <- dplyr::arrange(flights, desc(dep_delay)) 
+slice(tmp, 1:3)
+```
+
+- mutate
+`mutate` permet de créer de nouvelles colonnes dans le tableau de données, en général à partir de variables existantes.
+
+Par exemple, la table airports contient l’altitude de l’aéroport en pieds. Si on veut créer une nouvelle variable alt_m avec l’altitude en mètres, on peut faire :
+
+```{r}
+airports <- mutate(airports, alt_m = alt / 3.2808)
+select(airports, name, alt, alt_m)
+```
+
+On peut créer plusieurs nouvelles colonnes en une seule fois, et les expressions successives peuvent prendre en compte les résultats des calculs précédents. L’exemple suivant convertit d’abord la distance en kilomètres dans une variable distance_km, puis utilise cette nouvelle colonne pour calculer la vitesse en km/h.
+
+```{r}
+flights <- mutate(flights, 
+                  distance_km = distance / 0.62137,
+                  vitesse = distance_km / air_time * 60)
+select(flights, distance, distance_km, vitesse)
+```
+
+**Enchaîner les opérations avec le pipe**
+
+Quand on manipule un tableau de données, il est très fréquent d’enchaîner plusieurs opérations. On va par exemple filtrer pour extraire une sous-population, sélectionner des colonnes puis trier selon une variable.
+
+Pour simplifier et améliorer encore la lisibilité du code, on va utiliser un nouvel opérateur, baptisé pipe. Le pipe se note `%>%`, et son fonctionnement est le suivant : si j’exécute expr %>% f, alors le résultat de l’expression expr, à gauche du pipe, sera passé comme premier argument à la fonction f, à droite du pipe, ce qui revient à exécuter f(expr).
+
+Ainsi les deux expressions suivantes sont rigoureusement équivalentes :
+
+```{r}
+filter(flights, dest == "LAX")
+flights %>% filter(dest == "LAX")
+```
+
+On va pouvoir faire :
+
+```{r}
+flights %>% filter(dest == "LAX") %>% select(dep_delay, arr_delay)
+```
+
+Si la liste des fonctions enchaînées est longue, on peut les répartir sur plusieurs lignes à condition que l’opérateur %>% soit en fin de ligne :
+
+  
+```{r}
+flights %>% 
+  filter(dest == "LAX") %>% 
+  select(dep_delay, arr_delay) %>% 
+  arrange(dep_delay)
+```
+  
+Évidemment, il est naturel de vouloir récupérer le résultat final d’un pipeline pour le stocker dans un objet. Par exemple, on peut stocker le résultat du pipeline ci-dessus dans un nouveau tableau delay_la de la manière suivante :
+
+  
+```{r}
+delay_la <- flights %>% 
+  filter(dest == "LAX") %>% 
+  select(dep_delay, arr_delay) %>% 
+  arrange(dep_delay)
+```
+
+**Opérations groupées**
+
+- **group_by**
+
+Un élément très important de dplyr est la fonction `group_by. Elle permet de définir des groupes de lignes à partir des valeurs d’une ou plusieurs colonnes. 
+
+Par défaut ceci ne fait rien de visible, à part l’apparition d’une mention Groups dans l’affichage du résultat. Mais à partir du moment où des groupes ont été définis, les verbes comme slice, mutate ou summarise vont en tenir compte lors de leurs opérations.
+
+Par exemple, si on applique slice à un tableau préalablement groupé, il va sélectionner les lignes aux positions indiquées pour chaque groupe. Ainsi la commande suivante affiche le premier vol de chaque mois, selon leur ordre d’apparition dans le tableau :
+
+```{r}
+flights %>% group_by(month) %>% slice(1)
+```
+
+group_by peut aussi être utile avec filter, par exemple pour sélectionner les vols avec le retard au départ le plus important pour chaque mois :
+
+```{r}
+flights %>% 
+  group_by(month) %>% 
+  filter(dep_delay == max(dep_delay, na.rm = TRUE))
+```
+
+- **Summarise et count**
+
+`summarise` permet d’agréger les lignes du tableau en effectuant une opération “résumée” sur une ou plusieurs colonnes. Par exemple, si on souhaite connaître les retards moyens au départ et à l’arrivée pour l’ensemble des vols du tableau flights :
+
+```{r}
+
+flights %>% 
+  dplyr::summarise(
+    retard_dep = mean(dep_delay, na.rm=TRUE),
+    retard_arr = mean(arr_delay, na.rm=TRUE)
+  )
+```
+
+Cette fonction est en général utilisée avec group_by, puisqu’elle permet du coup d’agréger et résumer les lignes du tableau groupe par groupe. Si on souhaite calculer le délai maximum, le délai minimum et le délai moyen au départ pour chaque mois, on pourra faire :
+
+```{r}
+flights %>%
+  group_by(month) %>%
+  dplyr::summarise(
+    max_delay = max(dep_delay, na.rm=TRUE),
+    min_delay = min(dep_delay, na.rm=TRUE),
+    mean_delay = mean(dep_delay, na.rm=TRUE)
+  )
+```
+
+La fonction `count` permet de compter le nombre de lignes par groupe :
+
+```{r}
+flights %>%
+  dplyr::count(dest)
+```
+
+- **distinct**
+
+`distinct` filtre les lignes du tableau pour ne conserver que les lignes distinctes, en supprimant toutes les lignes en double.
+
+```{r}
+flights %>%
+  select(day, month) %>%
+  distinct
+```
+
+On peut lui spécifier une liste de variables : dans ce cas, pour toutes les observations ayant des valeurs identiques pour les variables en question, distinct ne conservera que la première d’entre elles.
+
+```{r}
+flights %>%
+  distinct(month, day)
+```
+
+L’option `.keep_all` permet, dans l’opération précédente, de conserver l’ensemble des colonnes du tableau :
+
+```{r}
+flights %>%
+  distinct(month, day, .keep_all = TRUE) 
+```
+
+## **Fusion de tables**
+
+En analysant des données, a souvent à gérer des données réparties dans plusieurs tables (par exemple une table de comptage d'OTU pour chaque échantillons, une table avec les métadata des échantillons, une table avec les informations taxonomiques des OTUs).
+
+On peut distinguer deux situations :
+
+l’ajout de variables (jointure entre tables)
+l’ajout d’observations (concaténation de tables)
+
+**La fonction merge et les jointures**
+
+Une opération relativement courante consiste à fusionner plusieurs tables pour regrouper tout ou partie des données dans un unique tableau.
+
+```{r}
+otus_table <- read_delim('data/otu_table.tsv', delim = '\t')
+otus_taxo <- read_delim('data/taxo.tsv', delim = '\t')
+```
+
+
+Pour procéder à une fusion des deux tableaux, on a besoin d’un identifiant qui permet d’identifier chaque ligne de manière unique et qui doit être présent dans tous les tableaux. Dans le cas de la table otu_taxo et de la table metadata, il s’agit de la variable Otu.
+
+Une fois l’identifiant identifié, on peut utiliser la commande merge. Celle-ci va fusionner les deux tableaux en supprimant les colonnes en double et en regroupant les lignes selon leurs identifiants :
+
+```{r}
+metadata_complete <- merge(otus_table, otus_taxo, by = "Otu")
+```
+
+Ici l’utilisation de la fonction merge est plutôt simple car nous sommes dans le cas de figure idéal : les lignes correspondent parfaitement et l’identifiant est clairement identifié. Parfois les choses peuvent être un peu plus compliquées :
+
+- parfois les identifiants n’ont pas le même nom dans les deux tableaux. On peut alors les spécifier par les options `by.x` et `by.y` ;
+- parfois les deux tableaux comportent des colonnes (hors identifiants) ayant le même nom. merge conserve dans ce cas ces deux colonnes mais les renomme en les suffixant par .x pour celles provenant du premier tableau et .y pour celles du second ;
+- parfois on n’a pas d’identifiant unique préétabli, mais on en construit un à partir de plusieurs variables. On peut alors donner un vecteur en paramètres de l’option by, par exemple by=c("nom","prenom","date.naissance").
+
+Par défaut, `merge ne conserve que les lignes présentes dans les deux tableaux.
+
+On peut cependant modifier ce comportement avec les options `all.x` et `all.y.
+
+Ainsi, all.x = TRUE indique de conserver toutes les lignes du premier tableau.
+
+Enfin, on peut décider de conserver toutes les lignes des deux tableaux en utilisant à la fois `all.x = TRUE`.
+
+
+**Jointures avec dplyr**
+
+Le jeu de données nycflights13 est un exemple de données réparties en plusieurs tables. Ici on en a trois : les informations sur les vols, celles sur les aéroports et celles sur les compagnies aériennes sont dans trois tables distinctes.
+
+```{r}
+data(flights)
+data(airports)
+data(airlines)
+```
+
+La table flights contient seulement le code de la compagnie aérienne du vol dans la variable carrier.
+
+Et que par ailleurs la table airlines contient une information supplémentaire relative à ces compagnies, à savoir le nom complet.
+
+On peut donc vouloir associer les deux, en l’occurrence pour ajouter les noms complets des compagnies à la table flights.
+
+Pour faire une jointure de ce type, on va utiliser la fonction left_join :
+
+```{r}
+left_join(flights, airlines) %>%
+  select(month, day, carrier, name)
+```
+
+Nous sommes ici dans le cas le plus simple concernant les clés de jointure : les deux clés sont uniques et portent le même nom dans les deux tables. Par défaut, si on ne lui spécifie pas explicitement les clés, dplyr fusionne en utilisant l’ensemble des colonnes communes aux deux tables. On peut d’ailleurs voir dans cet exemple qu’un message a été affiché précisant que la jointure s’est faite sur la variable carrier.
+
+**Clés explicites**
+
+La table airports, elle, contient des informations supplémentaires sur les aéroports : nom complet, altitude, position géographique, etc. Chaque aéroport est identifié par un code contenu dans la colonne faa.
+
+Si on regarde la table flights, on voit que le code d’identification des aéroports apparaît à deux endroits différents : pour l’aéroport de départ dans la colonne origin, et pour celui d’arrivée dans la colonne dest. On a donc deux clés de jointures possibles, et qui portent un nom différent de la clé de airports.
+
+On va commencer par fusionner les données concernant l’aéroport de départ. Pour simplifier l’affichage des résultats, on va se contenter d’un sous-ensemble des deux tables :
+
+```{r}
+flights_ex <- flights %>% select(month, day, origin, dest)
+airports_ex <- airports %>% select(faa, alt, name)
+```
+
+On doit donc spécifier explicitement les clés avec l’argument by de left_join. Ici la clé est nommée origin dans la première table, et faa dans la seconde. La syntaxe est donc la suivante :
+
+```{r}
+left_join(flights_ex, airports_ex, by = c("origin" = "faa"))
+```
+
+On constate que les deux nouvelles colonnes name et alt contiennent bien les données correspondant à l’aéroport de départ.
+
+On va stocker le résultat de cette jointure dans flights_ex :
+
+```{r}
+flights_ex <- flights_ex %>%
+  left_join(airports_ex, by = c("origin" = "faa"))
+```
+
+**Types de jointures**
+
+Jusqu’à présent nous avons utilisé la fonction left_join, mais il existe plusieurs types de jointures.
+
+Partons de deux tables d’exemple, personnes et voitures :
+
+```{r}
+personnes <- tibble(
+  nom = c("Sylvie", "Sylvie", "Monique", "Gunter", "Rayan", "Rayan"),
+  voiture = c("Twingo", "Ferrari", "Scenic", "Lada", "Twingo", "Clio")
+)
+voitures <- tibble(
+  voiture = c("Twingo", "Ferrari", "Clio", "Lada", "208"),
+  vitesse = c("140", "280", "160", "85", "160")
+)
+```
+
+**right_join**
+
+La jointure right_join est l’exacte symétrique de left_join, c’est-à dire que right_join(x, y) est équivalent à left_join(x,y) :
+
+```{r}
+right_join(personnes, voitures)
+```
+
+**inner_join**
+Dans le cas de inner_join, seules les lignes présentes à la fois dans x et y sont présentes (et si nécessaire dupliquées) dans la table résultat :
+
+```{r}
+inner_join(personnes, voitures)
+```
+
+Ici la ligne 208 est absente, ainsi que la ligne Monique, qui dans le cas d’un left_join avait été conservée et s’était vue attribuer une vitesse à NA.
+
+**full_join**
+Dans le cas de full_join, toutes les lignes de x et toutes les lignes de y sont conservées (avec des NA ajoutés si nécessaire) même si elles sont absentes de l’autre table :
+
+```{r}
+full_join(personnes, voitures)
+```
+
+## **Réorganiser ses données avec tidyr**
+
+**Tidy data**
+
+Les extensions du tidyverse comme dplyr ou ggplot2 partent du principe que les données sont “bien rangées” sous forme de tidy data.
+
+Prenons un exemple avec les données du fichier "data/population.tsv"
+
+```{r}
+populations <- read_delim("data/population.tsv", delim="\t")
+populations
+```
+
+Imaginons qu’on souhaite représenter avec ggplot2 l’évolution de la population pour chaque pays sous forme de lignes : c’est impossible avec les données sous ce format. Il faut que les colonnes de chaque années soit représentées sous la forme d'une unique colonne textuelle.
+
+Des données sont considérées comme tidy si :
+
+1. chaque ligne correspond à une observation
+2. chaque colonne correspond à une variable
+3. chaque valeur est présente dans une unique case de la table ou, de manière équivalente, si des unités d’observations différentes sont présentes dans des tables différentes.
+
+Pourquoi le tableau initiale n’est pas tidy ? Parce que si on essaie d’identifier les variables mesurées dans le tableau, il y en a trois : le pays, l’année et la population. Or elles ne correspondent pas aux colonnes de la table. 
+
+**Les verbes de tidyr**
+
+**pivot_longer : rassembler des colonnes**
+
+L’objectif de tidyr est de fournir des fonctions pour arranger ses données et les convertir dans un format tidy. Ces fonctions prennent la forme de verbes qui viennent compléter ceux de dplyr et s’intègrent parfaitement dans les séries de pipes (%>%), les pipelines, permettant d’enchaîner les opérations.
+
+Dans le tableau, une même variable (la population) est répartie sur plusieurs colonnes, chacune représentant une observation à un moment différent. On souhaite que la variable ne représente plus qu’une seule colonne, et que les observations soient réparties sur plusieurs lignes.
+
+Pour cela on va utiliser la fonction pivot_longer :
+
+```{r}
+populations %>% pivot_longer(c("1992","1997","2002","2007"), names_to = "annee", values_to = "population")
+populations
+```
+
+Notre table est désormais sous la forme tidy.
+
+**pivot_wider : disperser des lignes**
+
+La fonction pivot_wider est l’inverse de pivot_longer.
+
+Prenons un nouvel exemple:
+
+```{r}
+populations_2 <- read_delim("data/population_2.tsv", delim="\t")
+populations_2
+```
+
+Pourquoi la table n'est pas au format tidy ?
+
+Ce tableau a le problème inverse du précédent : on a deux variables, lifeExp et pop qui, plutôt que d’être réparties en deux colonnes, sont réparties entre plusieurs lignes.
+
+On va donc utiliser pivot_wider pour disperser ces lignes dans deux colonnes différentes :
+
+```{r}
+populations_2 %>% pivot_wider(names_from = variable, values_from = value)
+```
+
+pivot_wider prend deux arguments principaux :
+
+- names_from indique la colonne contenant les noms des nouvelles variables à créer
+- values_from indique la colonne contenant les valeurs de ces variables
+
+**separate : séparer une colonne en plusieurs**
+
+Parfois on a plusieurs informations réunies en une seule colonne et on souhaite les séparer. Soit le tableau d’exemple caricatural suivant, nommé df :
+
+```{r}
+df = tibble(
+  eleve = c("Félicien Machin","Raymonde Bidule","Martial Truc"),
+  note = c("5/20", "8/10", "60/100")
+)
+knitr::kable(df)
+```
+
+separate permet de séparer la colonne note en deux nouvelles colonnes note et note_sur :
+
+```{r}
+df %>% separate(note, c("note", "note_sur"))
+```
+
+separate prend deux arguments principaux, le nom de la colonne à séparer et un vecteur indiquant les noms des nouvelles variables à créer. Par défaut separate sépare au niveau des caractères non-alphanumérique (espace, symbole, etc.). On peut lui indiquer explicitement le caractère sur lequel séparer avec l’argument sep :
+
+```{r}
+df %>% tidyr::separate(eleve, c("prenom", "nom"), sep = " ")
+```
+
+**unite : regrouper plusieurs colonnes en une seule**
+
+unite est l’opération inverse de separate.
+
+On souhaite reconstruire une colonne code_insee qui indique le code INSEE de la commune, et qui s’obtient en concaténant le code du département et celui de la commune. On peut utiliser unite pour cela :
+df %>% unite(code_insee, code_departement, code_commune)
 
