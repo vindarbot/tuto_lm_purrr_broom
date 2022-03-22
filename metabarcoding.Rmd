@@ -1,0 +1,411 @@
+---
+title: "Metabarcoding analysis"
+author: "Vincent Darbot"
+date: "16/03/2022"
+output: 
+  html_document: 
+    code_folding: show
+    toc: yes
+    toc_float: yes
+    keep_md: TRUE
+---
+
+
+```{css, echo=FALSE}
+.spoiler {
+  visibility: hidden;
+}
+
+.spoiler::before {
+  visibility: visible;
+  content: "Survoler pour voir la réponse."
+}
+
+.spoiler:hover {
+  visibility: visible;
+}
+
+.spoiler:hover::before {
+  display: none;
+}
+```
+```{r, warning = FALSE, message = FALSE}
+library(ggplot2)
+library(tibble)
+library(dplyr)
+library(tidyr)
+library(readr)
+library(phyloseq)
+library(vegan)
+library(agricolae)
+library(DESeq2)
+library(dendextend)
+#if (!require("BiocManager", quietly = TRUE))
+#    install.packages("BiocManager")
+#BiocManager::install("microbiome")
+#BiocManager::install("DESeq2")
+```
+
+# **La librairie Phyloseq**
+
+## **Preprocessing**
+
+On utilise la librairie readr vu précédemment:
+```{r}
+otu_mat<- read_tsv("data/otu_table.tsv")
+tax_mat<- read_tsv("data/taxo.tsv")
+samples_df<- read_tsv("data/metadata.tsv")
+```
+
+Les objets Phyloseq ont besoin de row.names :
+
+```{r}
+otu_mat <- otu_mat %>%
+    tibble::column_to_rownames("Otu") 
+
+tax_mat <- tax_mat %>% 
+    tibble::column_to_rownames("Otu")
+
+samples_df <- samples_df %>% 
+    tibble::column_to_rownames("Sample") 
+```
+
+On remarque que dans le fichier metadata, la colonne " Sample_project " nous est inutile.
+
+On la retire à l'aide de la fonction select() déjà vu:
+
+```{r}
+samples_df<- samples_df %>% select(-Sample_project)
+```
+
+Transformer les infos phyloégéntiques et les matrices d'OTUs en matrices: 
+
+```{r}
+otu_mat <- as.matrix(otu_mat)
+tax_mat <- as.matrix(tax_mat)
+```
+
+Transofrmation en objet Phyloseq:
+
+```{r}
+  OTU = otu_table(otu_mat, taxa_are_rows = TRUE)
+  TAX = tax_table(tax_mat)
+  samples = sample_data(samples_df)
+  
+  carbom <- phyloseq(OTU, TAX, samples)
+  carbom
+```
+
+Voir les noms d'échantillons :
+```{r}
+sample_names(carbom)
+```
+
+Voir les noms de rangs taxonomiques:
+```{r}
+rank_names(carbom)
+```
+
+Voir les noms de colonnes metadata:
+
+```{r}
+sample_variables(carbom)
+```
+
+Si l'on souhaite par exemple analyser qu'au temps T17, on peut créer un sous-objet à partir de l'objet carbom :
+
+```{r}
+carbom_T17 <- subset_samples(carbom, Temps =="T17")
+carbom_T17
+```
+
+Si par exemple, on ne souhaite s'intéresser qu'à la classe des Bacteroidia, on peut créer un sous-ensemble à l'aide de la fonction `subset_taxt`:
+
+```{r}
+  carbom_bacteoridia <- subset_taxa(carbom, (Class %in% c("Bacteroidia")))
+  carbom_bacteoridia
+```
+
+## **Visualisations**
+
+A l'aide de l'objet phyloseq ne conservant que les Bacteoridia, on peut visualiser la répartition des Bacteoridia par Genre :
+  
+```{r}
+plot_bar(carbom_bacteoridia, x="Genus", fill = "Genus", facet_grid = Traitement~Prelevement) +
+  geom_bar(aes(color=Genus, fill=Genus), stat="identity", position="stack")
+```
+
+**Alpha diversité**
+
+```{r}
+plot_richness(carbom, measures=c("Chao1", "Shannon"), x="Prelevement", color="Prelevement")
+
+#plot_richness(carbom, measures=c("Chao1", "Shannon"), x="Prelevement", color="Temps")
+```
+
+**Visualisation de la Beta diversité sous forme d'heatmap**
+
+Une heatmap basique avec les paramètres par défaut.
+
+```{r}
+  plot_heatmap(carbom, method = "NMDS", distance = "bray")
+```
+
+La heatmap est assez conséquente est donc illisible, il est préférable de ne travailler que sur les OTUs majoritaires. 
+On peut par exemple décider de ne conserver que les OTUs qui ont une abondances d'au moins 10% dans au moins 1 échantillon :
+
+
+```{r}
+total<- min(sample_sums(carbom))
+
+carbom_abund <- filter_taxa(carbom, function(x) sum(x > total*0.1) > 0, TRUE)
+carbom_abund
+```
+
+On voit qu'on ne conserve plus que 30 OTUs.
+
+```{r}
+plot_heatmap(carbom_abund, method = "NMDS", distance = "bray")
+```
+
+**Ordination**
+
+Pour faire une analyse multivariée basée sur les distances de Bray-Curtis et une NMDS ordination.
+```{r}
+carbom.ord <- ordinate(carbom, "NMDS", "bray")
+```
+
+
+```{r}
+plot_ordination(carbom, carbom.ord, type="taxa", color="Class", shape= "Phylum", 
+                  title="OTUs")
+```
+
+la fonction facet_wrap permet de créer plusieurs pannels en fonction de la variable en question. le paramètre 3 permet d'indiquer le nombre de lignes que dont ou souhaite afficher les pannels.
+
+```{r}
+plot_ordination(carbom, carbom.ord, type="taxa", color="Class", 
+                  title="OTUs", label="Class") + 
+                  facet_wrap(~Phylum, 3)
+```
+
+On affiche les échantillons, et on élargit les points :
+
+```{r}
+plot_ordination(carbom, carbom.ord, type="samples", color="Temps", 
+                  shape="Prelevement", title="Samples") + geom_point(size=3)
+```
+
+Pour afficher à la fois l ordination des échantillons et des taxonomies :
+
+```{r}
+  plot_ordination(carbom, carbom.ord, type="split", color="Class", 
+                  shape="Temps", title="biplot", label = "station") +  
+  geom_point(size=3)
+```
+
+
+# **La librairie Vegan**
+
+## **Alpha diversité et calcul d'ANOVA**
+
+```{r}
+otu_mat<- read_tsv("data/otu_table.tsv")
+tax_mat<- read_tsv("data/taxo.tsv")
+samples_df<- read_tsv("data/metadata.tsv")
+samples_df <- samples_df %>% select(-Sample_project, -SampleID)
+```
+
+La fonction `diversity` de vegan permet de calculer les indices d'alpha diversités des échantillons. Comme les autres fonctions de vegan, il faut que les échantillons soient en lignes. Or comme dans notre fichier de métadonnées, les échantillons sont en colonne, on indique l'option " MARGIN = 2".
+
+```{r}
+samples_df$alpha <- diversity(otu_mat[, samples_df$Sample],
+                                 MARGIN = 2,
+                                 index = "invsimpson")
+
+samples_df$alpha <- as.numeric(samples_df$alpha)
+
+```
+
+Le fait d'avoir ajouter une colonne nous permet de facilement utiliser ggplot2 :
+
+```{r}
+#ggplot(samples_df) + aes(x = alpha) + geom_histogram()
+ggplot(samples_df) + aes(x = Prelevement, y = alpha) + geom_boxplot()
+```
+
+On peut utiliser une analyse des variances (ANOVA) pour nous dire si au moins un des échantillons est différents des autres. (Ce qui semble être le cas entre Caeca et le reste des zones de prélèvements)
+
+```{r}
+anova_result <- aov(alpha ~ Prelevement, samples_df)
+summary(anova_result)
+```
+
+Le résultat est en effet très significatif. 
+
+L'ANOVA nous indique qu'il y a une différence, mais ne nous précise pas quels sont les groupes qui diffèrent. Un test Tukey’s Honest Significant Difference (HSD) permet de réaliser les comparaisons deux à deux à partir du résultat de l'ANOVA, avec la fonction `HSD.test` de la librairie agricolae. 
+
+```{r}
+library(agricolae)
+tukey_result <- HSD.test(anova_result, "Prelevement", group = TRUE)
+print(tukey_result)
+```
+
+On constate qu'il y a une différence entre le groupe " Caeca " (groupe a) et les deux autres, et que les groupes Jabot et Ileon sont similaires entre eux (groupe b).
+
+On peut ajouter cette information sur le graphique précédent.
+
+```{r}
+# Pour mettreles groupes dans le bon ordre alphabétique.
+group_data <- tukey_result$groups[order(rownames(tukey_result$groups)),]
+
+# Construire le graphique
+ggplot(samples_df, aes(x = Prelevement, y = alpha)) +
+  geom_text(data = data.frame(),
+            aes(x = rownames(group_data), y = max(samples_df$alpha) + 1, label = group_data$groups),
+            col = 'black',
+            size = 10) +
+  geom_boxplot() +
+  ggtitle("Alpha diversity") +
+  xlab("Site") +
+  ylab("Alpha diversity index")
+```
+
+**Automatiser une fonction**
+
+Si l'on veut comparer une autre variable (comme le facteur Temps par exemple), il est plus pratique parfois de créer une fonction qui va automatiser la tâche, plutôt que de copier coller les lignes de commandes précédentes. Voilà à quoi ressemble une fonction qui résume ce que l'on a fait précédemment:
+
+```{r}
+compare_alpha <- function(sample_data, grouping_var) {
+  # Calcuate alpha diversity
+  sample_data$alpha <- diversity(otu_mat[, samples_df$Sample],
+                                 MARGIN = 2,
+                                 index = "invsimpson")
+  
+  # Do ANOVA
+  sample_data$grouping <- sample_data[[grouping_var]] # needed for how `aov` works
+  anova_result <- aov(alpha ~ grouping, sample_data)
+  
+  # Do Tukey's HSD test
+  tukey_result <- HSD.test(anova_result, "grouping", group = TRUE)
+
+  # Plot result
+  group_data <- tukey_result$groups[order(rownames(tukey_result$groups)),]
+  my_plot <- ggplot(sample_data, aes(x = grouping, y = alpha)) +
+    geom_text(data = data.frame(),
+              aes(x = rownames(group_data),
+                  y = max(sample_data$alpha) + 1,
+                  label = group_data$groups),
+              col = 'black',
+              size = 10) +
+    geom_boxplot() +
+    ggtitle("Alpha diversity") +
+    xlab(grouping_var) +
+    ylab("Alpha diversity index")
+  
+  # Return plot
+  return(my_plot)
+}
+```
+
+Ainsi, pour tester avec le facteur Temps:
+
+```{r}
+compare_alpha(samples_df, "Temps")
+```
+
+On constate ainsi les mêmes groupes avec le facteur Temps.
+
+## **Beta diversité**
+
+Nous avons vu comment visualiser les différences de compositions microbiennes entre échantillons avec la heatmap (phyloseq).
+
+Voyons comment calculer les métriques avec la librairie vegan.
+
+La fonction de vegan : `vegdist` permet de calculer les indices de beta diversités entre chaque paire d'échantillons pour un ensemble d'échantillons. Comme ce sont des comparaisons entre échantillons 2 à 2, la sortie est une matrice triangulaire.
+
+Dans R, la matrice est comme un data.frame, avec quelques particularités.
+
+```{r}
+beta_dist <- vegdist(t(otu_mat[, samples_df$Sample]),
+                     index = "bray")
+```
+
+Comme la fonction vegdist n'a pas de paramètre MARGIN (vu avec la fonction `diversity` pour calculer les indices de diversité alpha), nous avons besoin de transposer la matrice avec la fonction `t` afin d'avoir le nom des échantillons au bon endroit.
+
+Une autre représentation peut-être le dendogramme. Pour cela, on réalise un clusturing des échantillons à partir de la matrice de distances.
+```{r}
+#Save as dendrogram
+ward <- as.dendrogram(hclust(beta_dist, method = "ward.D2"))
+#Provide color codes
+meta <- data.frame(phyloseq::sample_data(otu_mat))
+colorCode <- c(T0 = "red", T9 = "purple", T17 = "blue")
+labels_colors(ward) <- colorCode[samples_df$Temps][order.dendrogram(ward)]
+#Plot
+plot(ward)
+```
+
+**permANOVA avec vegan**
+
+On peut effectuer une permANOVA à partir des données de béta diversité obtenues à l'aide de `vegan`.
+
+```{r}
+# On créé un vecteur qui indique pour chaque échantillon la valeur de la variable en question, par exemple quel type de Traitement.
+# Pour cela, on utilise la fonction sample_data() de vegan
+Traitement <- sample_data(carbom)$Traitement
+adonis(beta_dist ~ Traitement)
+```
+
+On constate que le facteur Traitement a un fort effet sur la matrice d'abondance des OTUs (pvalue < 0.001 ).
+
+**Exercice**
+
+On peut essayer de créer une fonction qui permet simplement de tester une permANOVA en donnant en entrée un facteur donné :
+
+```{r}
+launch_anova <- function(beta_matrice, grouping_var) {
+  
+  grouping_var <- sample_data(carbom)[[grouping_var]] 
+  result <- adonis(beta_matrice ~ grouping_var)
+  return(result)
+}
+
+launch_anova(beta_dist, "Temps")
+```
+
+
+
+## **Analyse différentielle d'expression avec DESeq2**
+
+Pour tester une différence d'expression à l'échelle des OTUs en utilisant DESeq2, nous avons besoin d'une table de comptage des OTUs, ainsi que d'une table de metadata pour choisir le design à tester.
+
+
+On récupère la matrice de comptage des OTUs à partir de l'objet phyloseq, ainsi que la table de metadata: 
+
+```{r}
+countData <- otu_table(carbom)
+colData <- sample_data(carbom)
+```
+
+
+```{r}
+#colData <- as.data.frame(colData)
+#countData <- as.data.frame(countData)
+#ds = DESeq2::DESeqDataSetFromMatrix(countData,colData,design=~Traitement)
+
+#ds = DESeq(ds)
+```
+
+
+
+
+
+
+
+<p class="spoiler">Answer</p>
+
+
+
+
+
+

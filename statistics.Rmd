@@ -1,5 +1,5 @@
 ---
-title: "Basics statistics and Metabarcoding analysis"
+title: "Basics statistics in RStudio"
 author: "Vincent Darbot"
 date: "16/03/2022"
 output: 
@@ -9,10 +9,6 @@ output:
     toc_float: yes
     keep_md: TRUE
 ---
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
 
 
 ```{css, echo=FALSE}
@@ -44,22 +40,409 @@ library(questionr)
 library(nycflights13)
 ```
 
-## R Markdown
+# **Introduction aux Statistiques sous RStudio**
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+Chargement du jeu de données utilisé :
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r}
+library(questionr)
+data("hdv2003")
+d <- hdv2003
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
+## **Statistique univariée**
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+On entend par statistique univariée l’étude d’une seule variable, que celle-ci soit quantitative ou qualitative. La statistique univariée fait partie de la statistique descriptive.
+
+Comme la fonction str nous l’a indiqué, notre tableau peuvent contenirent plusieurs variables numériques ou variables quantitatives (comptage des OTUs par exemple), dont la variable heures.tv qui représente le nombre moyen passé par les enquêtés à regarder la télévision quotidiennement. On peut essayer de déterminer quelques caractéristiques de cette variable, en utilisant les fonctions mean (moyenne), sd (écart-type), min (minimum), max (maximum), range (étendue) ou encore median (médianne).
+
+Plusieurs commandes de base dans R permettent de produire des graphiques pour représenter la distribution des valeurs d’une variable quantitative :
+
+**Histogramme **
+
+```{r}
+hist(d$heures.tv, main = "Nombre d'heures passées devant la télé par jour", xlab = "Heures", ylab = "Effectif")
+# breaks = c(0, 1, 4, 9, 12)
+#breaks = 7
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+Ici, les options main, xlab et ylab permettent de personnaliser le titre du graphique, ainsi que les étiquettes des axes. De nombreuses autres options existent pour personnaliser l’histogramme, parmi celles-ci on notera :
+
+- probability si elle vaut TRUE, l’histogramme indique la proportion des classes de valeurs au lieu des effectifs.
+- breaks permet de contrôler les classes de valeurs. On peut lui passer un chiffre, qui indiquera alors le nombre de classes, un vecteur, qui indique alors les limites des différentes classes, ou encore une chaîne de caractère ou une fonction indiquant comment les classes doivent être calculées.
+- col la couleur de l’histogramme.
+
+**Répartition cumulée**
+
+```{r}
+plot(ecdf(d$heures.tv))
+```
+
+**Boîtes à moustaches**
+
+```{r}
+boxplot(d$heures.tv, main = "Nombre d'heures passées devant la télé par jour", ylab = "Heures")
+```
+
+**Etude d'une variable qualtitative**
+
+```{r}
+freq(d$qualif)
+#freq(d$qualif, cum = TRUE, total = TRUE, sort = "inc", digits = 2, exclude = NA)
+```
+
+La colonne n donne les effectifs bruts, la colonne % la répartition en pourcentages et val% la répartition en pourcentages, données manquantes exclues. La fonction accepte plusieurs paramètres permettant d’afficher les totaux, les pourcentages cumulés, de trier selon les effectifs ou de contrôler l’affichage. 
+
+Pour représenter la répartition des effectifs parmi les modalités d’une variable qualitative, on privilégiera les diagrammes de Cleveland, obtenus avec la fonction `dotchart`. On doit appliquer cette fonction au tri à plat de la variable, obtenu avec `table` :
+
+```{r}
+dotchart(as.matrix(table(d$clso))[, 1], main = "Sentiment d'appartenance à une classe sociale", pch = 19)
+#dotchart(as.matrix(sort(table(d$qualif)))[, 1], main = "Niveau de qualification")
+```
+
+## **Statistique bivariée**
+
+On entend par statistique bivariée l’étude des relations entre deux variables, celles-ci pouvant être quantitatives ou qualitatives. La statistique bivariée fait partie de la statistique descriptive.
+
+**Deux variables quantitatives**
+
+La comparaison de deux variables quantitatives se fait en premier lieu graphiquement, en représentant l’ensemble des couples de valeurs. On peut ainsi représenter les valeurs du nombre d’heures passées devant la télévision selon l’âge.
+
+```{r}
+plot(d$age, d$heures.tv, pch = 19, col = rgb(1, 0, 0, 0.1))
+```
+
+Il n’y a pas de structure très nette qui semble se dégager. 
+
+Pour confirmer 
+
+À nouveau, commençons par représenter les deux variables :
+
+```{r}
+reg <- lm(heures.tv ~ age, data = d)
+summary(reg)
+```
+
+Le résultat montre que les coefficients sont significativement différents de 0. (p-value = 1.324e-15). Finalement, le nombre d'heures devant la télé augmente significativement avec l'âge.
+
+On peut observer la droite de régression avec la fonction abline :
+
+```{r}
+plot(d$age, d$heures.tv, pch = 19, col = rgb(1, 0, 0, 0.1))
+abline(reg, col = "black")
+```
+
+On remarquera que le premier argument passé à la fonction lm a une syntaxe un peu particulière. Il s’agit d’une formule, utilisée de manière générale dans les modèles statistiques. On indique la variable d’intérêt à gauche et la variable explicative à droite, les deux étant séparées par un tilde ∼ (obtenu sous Windows en appuyant simultanément sur les touches Alt Gr et 2). On remarquera que les noms des colonnes de notre tableau de données ont été écrites sans guillemets.
+
+Dans le cas présent, nous avons calculé une régression linéaire simple entre deux variables, d’où l’écriture cadres ∼ dipl.sup. Si nous avions voulu expliquer une variable z par deux variables x et y, nous aurions écrit z ∼ x + y. Il est possible de spécifier des modèles encore plus complexes.
+
+**Une variable quantitative et une variable qualitative**
+
+Quand on parle de comparaison entre une variable quantitative et une variable qualitative, on veut en général savoir si la distribution des valeurs de la variable quantitative est la même selon les modalités de la variable qualitative. En clair : est ce que l’âge de ceux qui écoutent du hard rock est différent de l’âge de ceux qui n’en écoutent pas ?
+
+Là encore, l’idéal est de commencer par une représentation graphique. Les boîtes à moustaches (boxplot en anglais) sont parfaitement adaptées pour cela.
+
+Si on a construit des sous-populations d’individus écoutant ou non du hard rock, on peut utiliser la fonction boxplot.
+
+```{r}
+boxplot(age ~ hard.rock, data = d)
+```
+
+À première vue, la population écoutant du hard rock a l’air sensiblement plus jeune.
+
+Peut-on le tester mathématiquement ?
+
+```{r}
+t.test(age ~ hard.rock, data = d)
+```
+
+Le test est extrêmement significatif. L’intervalle de confiance à 95 % de la différence entre les deux moyennes va de 16,1 ans à 25,3 ans.
+
+## **Introduction à ggplot2, la grammaire des graphiques**
+
+L’extension ggplot2, développée par Hadley Wickham et mettant en œuvre la grammaire graphique théorisée par Leland Wilkinson, devient vite indispensable lorsque l’on souhaite réaliser des graphiques plus complexes. On renvoit le lecteur intéressé à l’ouvrage de Winston Chang, R Graphics Cookbook, disponible gratuitement dans sa deuxième édition à l’adresse suivante : https://r-graphics.org.
+
+Ce chapitre, articulé autour d’une étude de cas, présente ggplot2 à partir d’un exemple simple de visualisation de séries temporelles, puis rentre dans le détail de sa syntaxe.
+
+```{r}
+library(readr)
+
+# emplacement souhaité pour le jeu de données
+file <- "data/debt.csv"
+
+# télécharger le jeu de données s'il n'existe pas
+if(!file.exists(file))
+  download.file("http://www.stat.cmu.edu/~cshalizi/uADA/13/hw/11/debt.csv",
+                file, mode = "wb")
+
+# charger les données dans l'objet 'debt'
+debt <- read_csv(file)
+```
+
+**Les données de l’exemple**
+
+Il y a quelques années, les chercheurs Carmen M. Reinhart et Kenneth S. Rogoff publiaient un article intitulé Growth in a Time of Debt, dans lequel ils faisaient la démonstration qu’un niveau élevé de dette publique nuisait à la croissance économique. Plus exactement, les deux chercheurs y défendaient l’idée que, lorsque la dette publique dépasse 90 % du produit intérieur brut, ce produit cesse de croître.
+
+Cette conclusion, proche du discours porté par des institutions comme le Fonds Monétaire International, a alimenté plusieurs argumentaires politiques. Des parlementaires américains s’en ainsi sont servi pour exiger une diminution du budget fédéral, et surtout, la Commission européenne s’est appuyée sur cet argumentaire pour exiger que des pays comme la Grèce, durement frappés par la crise financière globale de 2008, adoptent des plans d’austérité drastiques.
+
+Or, en tentant de reproduire les résultats de Reinhart et Rogoff, les chercheurs Thomas Herndon, Michael Ash et Robert Pollin y ont trouvé de nombreuses erreurs, ainsi qu’une bête erreur de calcul due à une utilisation peu attentive du logiciel Microsoft Excel. La révélation de ces erreurs donna lieu à un débat très vif entre adversaires et partisans des politiques économiques d’austérité, débat toujours autant d’actualité aujourd’hui.
+
+Dans ce chapitre, on va se servir des données (corrigées) de Reinhart et Rogoff pour évaluer, de manière indépendante, la cohérence de leur argument sur le rapport entre endettement et croissance économique. Commençons par récupérer ces données au format CSV sur le site du chercheur américain Cosma Shalizi, qui utilise ces données dans l’un de ses exercices de cours :
+
+**Nettoyage des données**
+
+Les données de Reinhart et Rogoff contiennent, pour un échantillon de 20 pays occidentaux membres de la zone OCDE, la croissance de leur produit intérieur brut (PIB), et le ratio entre leur dette publique et ce produit, exprimé sous la forme d’un pourcentage Dette / PIB. Les données vont du milieu des années 1940 à la fin des années 2000. 
+
+```{r}
+# inspection du jeu de données
+str(debt)
+```
+
+La première colonne du jeu de données ne contenant que les numéros des lignes, on va la supprimer d’entrée de jeu :
+
+```{r}
+# suppression de la première colonne
+debt <- debt[, -1]
+```
+
+Il faut aussi noter d’emblée que certaines mesures sont manquantes : pour certains pays, on ne dispose pas d’une mesure fiable du PIB et/ou de la dette publique. En conséquence, le nombre d’observations par pays est différent, et va de 40 observations pays-année pour la Grèce à 64 observations pays-année pour plusieurs pays comme l’Australie ou les États-Unis :
+
+```{r}
+table(debt$Country)
+```
+
+**Recodage d’une variable**
+
+Dernière manipulation préalable avant l’analyse : on va calculer la décennie de chaque observation, en divisant l’année de mesure par 10, et en multipliant la partie entière de ce résultat par 10. Cette manipulation très simple donne 1940 pour les mesures des années 1940 à 1949, 1950 pour les années 1950-1959, et ainsi de suite.
+
+```{r}
+debt$Decade <- factor(10 * debt$Year %/% 10)
+
+head(debt)
+```
+
+**Visualisation des données**
+
+Chargeons à présent l’extension graphique ggplot2 :
+
+```{r}
+library(ggplot2)
+```
+
+ Si l’on souhaite visualiser la croissance du PIB au cours du temps, la solution basique dans R s’écrit de la manière suivante :
+
+```{r}
+with(debt, plot(Year, growth))
+```
+
+Le code de la visualisation est très simple et se lit : avec l’objet debt, construire le graphique montrant l’année d’observation Year en abcisse et le taux de croissance du PIB growth en ordonnée. Le code est compris de cette manière par R car la fonction plot comprend le premier argument comme étant la variable à représenter sur l’axe horizontal x, et le second comme la variable à représenter sur l’axe vertical y.
+
+Le même graphique s’écrit de la manière suivante avec l’extension ggplot2 :
+
+```{r}
+with(debt, qplot(Year, growth))
+```
+
+Par ailleurs, dans les deux exemples précédents, on a écrit with(debt, ...) pour indiquer que l’on travaillait avec l’objet debt. Lorsque l’on travaille avec l’extension ggplot2, il est toutefois plus commun d’utiliser l’argument data dans l’appel de qplot pour indiquer ce choix :
+
+```{r}
+qplot(Year, growth, data = debt)
+```
+
+**Visualisation par petits multiples**
+
+```{r}
+qplot(Year, growth, data = debt) +
+  facet_wrap(~ Country)
+```
+
+
+**Visualisation en séries temporelles**
+
+Enfin, pour produire le même graphique que ci-dessus en utilisant des lignes plutôt que des points, il suffit d’utiliser l’argument geom = "line", ce qui peut être considéré comme une meilleure manière de visualiser des séries temporelles, mais qui tend aussi à rendre plus difficile la détection des périodes pour lesquelles il manque des données (voir, à nouveau, le graphique pour l’Espagne) :
+
+```{r}
+qplot(data = debt, y = growth, x = Year, geom = "line") + 
+  facet_wrap(~ Country)
+```
+
+**Composition graphique avec ggplot2**
+
+La section précédente a montré comment utiliser la fonction qplot (quick plot). La syntaxe complète de l’extension ggplot2 passe par une autre fonction, ggplot, qui permet de mieux comprendre les différents éléments de sa grammaire graphique. Dans cette section, on va détailler cette syntaxe pour en tirer un graphique plus complexe que les précédents.
+
+Commençons par créer un treillis de base au graphique :
+
+```{r}
+p <- ggplot(data = debt, aes(y = growth, x = ratio))
+```
+
+Aucun graphique ne s’affiche ici : en effet, ce que l’on a stocké, dans l’objet p, n’est pas un graphique complet, mais une base de travail. Cette base définit les coordonnées x et y du graphique dans l’argument aes (aesthetics). Ici, on a choisi de mettre la variable dépendante de Reinhart et Rogoff, growth (le taux de croissance du PIB), sur l’axe y, et la variable indépendante ratio (le ratio Dette publique / PIB) sur l’axe x.
+
+Rajoutons désormais un objet géométrique, geom_point, qui va projeter, sur le graphique, des points aux coordonnées précédemment définies, et divisons le graphique par un petit multiple, en projetant les points de chaque décennie dans une facette différente du graphique. Ce graphique propose une décomposition temporelle de la relation étudiée par Reinhart et Rogoff :
+
+```{r}
+p + geom_point() +
+  facet_grid(. ~ Decade) +
+  scale_x_continuous(breaks = seq(0, 200, by = 100))
+```
+
+Le paramètre facet_grid, qui utilise aussi la syntaxe équation, permet de créer des facettes plus compliquées que celles créées par le paramètre facet_wrap, même si, dans nos exemples, on aurait pu utiliser aussi bien l’un que l’autre.
+
+Grâce à l’argument scale_x_continuous, on va pouvoir clarifier cet axe en n’y faisant figurer que certaines valeurs.
+
+```{r}
+p <- p + geom_point() +
+  facet_grid(. ~ Decade) +
+  scale_x_continuous(breaks = seq(0, 200, by = 100))
+```
+
+Quand la sortie graphique nous convient, on l'enregistre dans l'objet p.
+
+**Couleurs et échelles**
+Abordons désormais un élément-clé de ggplot2 : la manipulation des paramètres esthétiques. Précédemment, on n’a montré que deux de ces paramètres : x et y, les coordonnées du graphique. Mais ces paramètres peuvent aussi influencer la couleur des points de notre graphique comme le montre l’exemple suivant :
+
+```{r}
+p <- p + aes(color = ratio < 90) +
+  scale_color_brewer("", palette = "Set1",
+                     labels = c("ratio > 90", "ratio < 90"))
+p
+```
+
+Que peut-on dire, à ce stade, du seuil fatidique de Reinhart et Rogoff ? On peut observer qu’après la Seconde guerre mondiale, de nombreux pays sont déjà endettés au-delà de ce seuil, et dégagent déjà moins de croissance que les autres. Sur la base de cette trajectoire, de nombreux critiques de Reinhart et Rogoff ont fait remarquer que le raisonnement de Reinhart et Rogoff pose en réalité un sérieux problème d’inversion du rapport causal entre endettement et croissance au cours du temps.
+
+Dans le bloc de code ci-dessus, on a stocké l’ensemble de nos modifications dans l’objet p, sans l’afficher ; en effet, on souhaite encore procéder à une dernière modification, en rajoutant une régression locale à travers les points de chaque facette. Après consultation de la documentation de ggplot2 ici et là, on en arrive au code ci-dessous, où p produit le graphique précédent et geom_smooth produit la régression locale :
+
+```{r}
+p + geom_smooth(method = "loess", se = FALSE,
+                size = 1, color = "black")
+```
+
+**Export des graphiques**
+
+```{r}
+ggsave("reinhart-rogoff.pdf", plot = p,
+       width = 11, height = 8)
+```
+
+## **Aller plus loin avec ggplot2**
+
+Tous les graphiques avec ggplot2 suivent une même logique. En premier lieu, on appelera la fonction ggplot en lui passant en paramètre le fichier de données.
+
+ggplot2 nomme esthétiques les différentes propriétés visuelles d’un graphique, à savoir l’axe des x (x), celui des y (y), la couleur des lignes (colour), celle de remplissage des polygones (fill), le type de lignes (linetype), etc. Une représentation graphique consiste donc à représenter chacune de nos variables d’intérêt selon une esthétique donnée. En second lieu, on appelera donc la fonction aes pour indiquer la correspondance entre les variables de notre fichier de données et les esthétiques du graphique.
+
+A minima, il est nécessaire d’indiquer en troisième lieu une géométrie, autrement dit la manière dont les éléments seront représentés visuellement. À chaque géométrie corresponds une fonction commençant par geom_, par exemple geom_point pour dessiner des points, geom_line pour des lignes, geom_bar pour des barres ou encore geom_area pour des aires. Il existe de nombreuses géométries différentes, chacune prenant en compte certaines esthétiques, certaines étant requises pour cette géométrie et d’autres optionnelles. La liste des esthétiques prises en compte par chaque géométrie en indiquée dans l’aide en ligne de cette dernière.
+
+ggplot2 reposant sur une syntaxe additive, la syntaxe de base d’un graphique sera donc de la forme :
+
+```{r}
+#ggplot(data, aes(x = Var1, fill = Var2)) + geom_bar()
+```
+
+```{r}
+data("hdv2003")
+d <- hdv2003
+```
+
+Pour un histogramme, on aura recours à la géométrie geom_histogram.
+
+```{r}
+ggplot(d) +
+  aes(x = heures.tv) +
+  geom_histogram() +
+  ggtitle("Nombres d'heures passées devant la télévision") +
+  xlab("Heures") +
+  ylab("Effectifs")
+
+#ggplot(d) +
+#  aes(x = heures.tv) +
+#  geom_histogram(fill ="orange", colour = "black", binwidth = 2) +
+#  ggtitle("Nombres d'heures passées devant la télévision") +
+#  xlab("Heures") +
+#  ylab("Effectifs")
+```
+
+## **Comparaisons (moyennes et proportions)**
+
+Y a t'il un écart statistiquement significatif entre l'âge des personnes écoutant du hard rock et celles n'en écoutant pas ? Pour cela on peut faire un test t de Student de comparaison de moyennes à l’aide de la fonction t.test :
+
+```{r}
+t.test(age ~ hard.rock, data = d)
+```
+
+Le test est extrêmement significatif. L’intervalle de confiance à 95 % de la différence entre les deux moyennes va de 16,1 ans à 25,3 ans.
+
+Nous sommes cependant allés un peu vite en besogne, car nous avons négligé une hypothèse fondamentale du test t : les ensembles de valeur comparés doivent suivre approximativement une loi normale et être de même variance.
+
+Comment vérifier que l’hypothèse de normalité est acceptable pour ces données ? D’abord avec un petit graphique composés de deux histogrammes :
+
+```{r}
+par(mfrow = c(1, 2))
+hist(d$age[d$hard.rock == "Oui"], main = "Hard rock", col = "red")
+hist(d$age[d$hard.rock == "Non"], main = "Sans hard rock", col = "red")
+```
+
+
+Les données semblent suivre une loi normale. Si on veut en avoir le cœur net on peut utiliser le test de normalité de Shapiro-Wilk avec la fonction shapiro.test :
+
+```{r}
+shapiro.test(d$age[d$hard.rock == "Oui"])
+shapiro.test(d$age[d$hard.rock == "Non"])
+```
+
+Visiblement, le test estime que les distributions ne sont pas suffisamment proches de la normalité dans les deux cas.
+
+Pour l'égalité des variances, on peut le vérifier avec le test d’égalité des variances fourni par la fonction var.test :
+
+```{r}
+var.test(age ~ hard.rock, data = d)
+```
+
+La différence est très significative. En toute rigueur le test t n’aurait donc pas pu être utilisé.
+
+**Comparaison des rangs ou de la médiane**
+
+Les données ne suivant pas une loi normale, nous pouvons utiliser le test de Wilcoxon/Mann-Whitney. Celui-ci a l’avantage d’être non-paramétrique, c’est à dire de ne faire aucune hypothèse sur la distribution des échantillons comparés, à l’exception que celles-ci ont des formes à peu près comparables (essentiellement en termes de variance). Attention, il ne s’agit pas d’un test comparant les différences de médianes (pour cela il existe le test de Mood) mais d’un test reposant sur la somme des rangs des observations, au lieu des valeurs brutes, dans les deux groupes, via la fonction wilcox.test :
+
+```{r}
+wilcox.test(age ~ hard.rock, data = d, conf.int=TRUE)
+```
+
+Attention : Le test de Wilcoxon n’est pas adapté pour comparer les rangs lorsque l’on a trois groupes ou plus. On pourra dans ce cas là avoir recours au test de Kruskal-Wallis avec la fonction krukal.test.
+
+```{r}
+kruskal.test(age ~ hard.rock, data = d)
+```
+
+**Comparaison de proportions**
+
+La fonction prop.test permets d’effectuer un test de comparaison de deux proportions.
+
+Supposons que l’on souhaite comparer la proportion de personnes faisant du sport entre ceux qui lisent des bandes dessinées et les autres :
+
+```{r}
+tab <- xtabs(~ lecture.bd + sport, data = d)
+```
+
+Il suffit de transmettre notre tableau croisé (à 2×2 dimensions) à prop.test :
+
+```{r}
+prop.test(tab)
+```
+
+On pourra également avoir recours à la fonction fisher.test qui renverra notamment l’odds ratio et son intervalle de confiance correspondant :
+
+```{r}
+fisher.test(tab)
+```
+
+
+
+  
+
+
+
+
+
+
