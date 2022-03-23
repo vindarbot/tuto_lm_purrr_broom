@@ -35,8 +35,8 @@ library(dplyr)
 library(tidyr)
 library(stringr)
 library(readr)
-library(questionr)
 library(nycflights13)
+library(questionr)
 ```
 
 # **Prise en main**
@@ -573,7 +573,6 @@ dplyr fait partie du coeur du tidyverse, elle est donc chargée automatiquement 
 On charge aussi le jeu de données nycflights3.
 
 ```{r}
-library(tidyverse)
 library(nycflights13)
 data(flights)
 data(airports)

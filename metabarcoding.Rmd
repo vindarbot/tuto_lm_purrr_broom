@@ -35,15 +35,16 @@ library(tibble)
 library(dplyr)
 library(tidyr)
 library(readr)
-library(phyloseq)
 library(vegan)
 library(agricolae)
 library(DESeq2)
 library(dendextend)
+library(phyloseq)
 #if (!require("BiocManager", quietly = TRUE))
 #    install.packages("BiocManager")
 #BiocManager::install("microbiome")
 #BiocManager::install("DESeq2")
+#BiocManager::install("phyloseq")
 ```
 
 # **La librairie Phyloseq**
@@ -379,7 +380,6 @@ launch_anova(beta_dist, "Temps")
 
 Pour tester une différence d'expression à l'échelle des OTUs en utilisant DESeq2, nous avons besoin d'une table de comptage des OTUs, ainsi que d'une table de metadata pour choisir le design à tester.
 
-
 On récupère la matrice de comptage des OTUs à partir de l'objet phyloseq, ainsi que la table de metadata: 
 
 ```{r}
@@ -391,18 +391,25 @@ colData <- sample_data(carbom)
 ```{r}
 #colData <- as.data.frame(colData)
 #countData <- as.data.frame(countData)
-#ds = DESeq2::DESeqDataSetFromMatrix(countData,colData,design=~Traitement)
+carbom.sub <- subset_samples(carbom, Traitement %in% c('amoxicilline','temoin_negatif'))
+countData <- otu_table(carbom.sub)
+colData <- sample_data(carbom.sub)
 
-#ds = DESeq(ds)
+otu_table(countData.pse) <- otu_table(countData) + 1
+
+
+ds = phyloseq_to_deseq2(carbom.sub, design=~Traitement)
+
+ds = DESeq(ds)
 ```
 
 
 
-
-
-
-
 <p class="spoiler">Answer</p>
+
+
+
+
 
 
 
