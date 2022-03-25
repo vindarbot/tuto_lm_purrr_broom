@@ -180,6 +180,7 @@ On peut combiner la fonction `c` et la fonction `rep` pour répéter plusieurs v
 
 ```{r}
 rep(c("a", "b"), 3)
+?(rep)
 ```
 <br>
 
@@ -389,6 +390,7 @@ On va souvent avoir besoin de nommer les lignes du tableau :
 
 ```{r}
 row.names(df) <- c("Anna", "Mary-Ann", "Michael", "John")
+df
 ```
 
 Pour extraire la première colonne du tableau, on utilisera les crochets, ou le dollar vu précédemment :
@@ -414,7 +416,7 @@ df[1:2, ]
 Pour accéder aux deux dernières lignes d'un tableau :
 
 ```{r}
-tail(df, 2)
+tail(df,2)
 ```
 
 Pour avoir quelques statistiques de base sur le tableau :
@@ -443,14 +445,17 @@ levels(d$sexe)
 Si on veut modifier la valeur du sexe du premier individu de notre tableau de données avec une valeur non autorisée, on obient un message d’erreur et une valeur manquante est utilisée à la place :
 
 ```{r}
-d$sexe[1] <- "Chihuahua"
+#d$sexe[1] <- "Chihuahua"
+d$age[1]
 ```
 
 On peut très facilement créer un facteur à partir d’une variable textuelle avec la fonction factor :
 
 ```{r}
-v <- factor(c("H", "H", "F", "H"))
-v
+v <- c("H", "H", "F", "H")
+class(v)
+v <- factor(v)
+class(v)
 ```
 
 
@@ -514,6 +519,7 @@ R propose une interface permettant de visualiser le contenu d’un tableau de do
 
 ```{r}
 metadata <- read_delim('data/metadata.tsv', delim = '\t')
+
 ```
 
 
@@ -538,6 +544,9 @@ cut permet ici de découper les valeurs de prondeurs en 3 intervalles (0-30, 30-
 ```{r}
 metadata$Zones <- cut(metadata$Profondeur, c(0,30,70,100), labels = c("Surface","Moyenne","Profonde"), include.lowest=TRUE)
 metadata
+write_delim(metadata, "data/metadata_zones.tsv", delim="\t")
+blabla <- read_delim(file = "data/metadata_zones.tsv", delim="\t")
+blabla
 ```
 
 **Variables calculées**
@@ -548,6 +557,7 @@ Supposons que l’on souhaite calculer une variable indiquant l’écart entre l
 
 ```{r}
 metadata$Ecart.profondeur <- metadata$Profondeur - mean(metadata$Profondeur, na.rm = TRUE)
+metadata
 ```
 
 **Combiner plusieurs variables**
@@ -556,9 +566,11 @@ On peut ainsi vouloir combiner plusieurs variables qualitatives en une seule.
 
 ```{r}
 metadata$combinaison <- NA 
+
+
 metadata$combinaison[metadata$Prelevement == "Caeca" & metadata$Temps == "T0" ] <- "Caeca_Start"
-metadata$combinaison[metadata$Prelevement == "Jabot" & metadata$Temps == "T0" ] <- "Jabot_Start"
-metadata$combinaison[metadata$Prelevement == "Ileon" & metadata$Temps == "T0" ] <- "Ileon_Start"
+metadata
+
 ```
 
 ## **Manipuler les données avec dplyr**
@@ -594,6 +606,7 @@ Le verbe slice sélectionne des lignes du tableau selon leur position. On lui pa
 Si on veut sélectionner les 5 premières lignes :
 
 ```{r}
+airports[1:5,]
 slice(airports, 1:5)
 ```
 
@@ -605,6 +618,7 @@ Par exemple, si on veut sélectionner les vols du mois de janvier, on peut filtr
 
 ```{r}
 filter(flights, month == 1)
+
 ```
 
 Si on veut uniquement les vols avec un retard au départ (variable dep_delay) compris entre 10 et 15 minutes :
@@ -656,6 +670,7 @@ Pour réordonner des colonnes, on pourra aussi avoir recours à `relocate` en in
 
 ```{r}
 relocate(airports, lon, lat, name)
+select(airports, lon, lat, name, everything())
 ```
 
 - **arrange**
@@ -693,6 +708,7 @@ slice(tmp, 1:3)
 Par exemple, la table airports contient l’altitude de l’aéroport en pieds. Si on veut créer une nouvelle variable alt_m avec l’altitude en mètres, on peut faire :
 
 ```{r}
+airports
 airports <- mutate(airports, alt_m = alt / 3.2808)
 select(airports, name, alt, alt_m)
 ```
@@ -700,6 +716,8 @@ select(airports, name, alt, alt_m)
 On peut créer plusieurs nouvelles colonnes en une seule fois, et les expressions successives peuvent prendre en compte les résultats des calculs précédents. L’exemple suivant convertit d’abord la distance en kilomètres dans une variable distance_km, puis utilise cette nouvelle colonne pour calculer la vitesse en km/h.
 
 ```{r}
+flights$distance_km <- flights$distance / 0.6
+flights
 flights <- mutate(flights, 
                   distance_km = distance / 0.62137,
                   vitesse = distance_km / air_time * 60)
@@ -716,7 +734,8 @@ Ainsi les deux expressions suivantes sont rigoureusement équivalentes :
 
 ```{r}
 filter(flights, dest == "LAX")
-flights %>% filter(dest == "LAX")
+
+flights %>% filter(dest == "LAX") 
 ```
 
 On va pouvoir faire :
@@ -756,12 +775,15 @@ Par défaut ceci ne fait rien de visible, à part l’apparition d’une mention
 Par exemple, si on applique slice à un tableau préalablement groupé, il va sélectionner les lignes aux positions indiquées pour chaque groupe. Ainsi la commande suivante affiche le premier vol de chaque mois, selon leur ordre d’apparition dans le tableau :
 
 ```{r}
+flights  %>% slice(1)
 flights %>% group_by(month) %>% slice(1)
 ```
 
 group_by peut aussi être utile avec filter, par exemple pour sélectionner les vols avec le retard au départ le plus important pour chaque mois :
 
 ```{r}
+flights %>%
+  filter(dep_delay == max(dep_delay, na.rm = TRUE))
 flights %>% 
   group_by(month) %>% 
   filter(dep_delay == max(dep_delay, na.rm = TRUE))
@@ -773,8 +795,8 @@ flights %>%
 
 ```{r}
 
-flights %>% 
-  dplyr::summarise(
+flights %>%
+  summarise(
     retard_dep = mean(dep_delay, na.rm=TRUE),
     retard_arr = mean(arr_delay, na.rm=TRUE)
   )
@@ -838,6 +860,7 @@ Une opération relativement courante consiste à fusionner plusieurs tables pour
 
 ```{r}
 otus_table <- read_delim('data/otu_table.tsv', delim = '\t')
+otus_table <- otus_table %>% rename(Cluster = Otu)
 otus_taxo <- read_delim('data/taxo.tsv', delim = '\t')
 ```
 
@@ -847,12 +870,13 @@ Pour procéder à une fusion des deux tableaux, on a besoin d’un identifiant q
 Une fois l’identifiant identifié, on peut utiliser la commande merge. Celle-ci va fusionner les deux tableaux en supprimant les colonnes en double et en regroupant les lignes selon leurs identifiants :
 
 ```{r}
-metadata_complete <- merge(otus_table, otus_taxo, by = "Otu")
+metadata_complete <- merge(otus_table, otus_taxo, by.x = "Cluster", by.y = "Otu")
+metadata_complete
 ```
 
 Ici l’utilisation de la fonction merge est plutôt simple car nous sommes dans le cas de figure idéal : les lignes correspondent parfaitement et l’identifiant est clairement identifié. Parfois les choses peuvent être un peu plus compliquées :
 
-- parfois les identifiants n’ont pas le même nom dans les deux tableaux. On peut alors les spécifier par les options `by.x` et `by.y` ;
+- parfois les identifiants n’ont pas le même nom dans les deux tableaux. On peut alors les spécifier par les options `by.x` et `by.y` ; 
 - parfois les deux tableaux comportent des colonnes (hors identifiants) ayant le même nom. merge conserve dans ce cas ces deux colonnes mais les renomme en les suffixant par .x pour celles provenant du premier tableau et .y pour celles du second ;
 - parfois on n’a pas d’identifiant unique préétabli, mais on en construit un à partir de plusieurs variables. On peut alors donner un vecteur en paramètres de l’option by, par exemple by=c("nom","prenom","date.naissance").
 
@@ -993,8 +1017,10 @@ Dans le tableau, une même variable (la population) est répartie sur plusieurs 
 Pour cela on va utiliser la fonction pivot_longer :
 
 ```{r}
-populations %>% pivot_longer(c("1992","1997","2002","2007"), names_to = "annee", values_to = "population")
-populations
+populations_tidy <- populations %>% pivot_longer(c("1992","1997","2002","2007"), names_to = "annee", values_to = "population")
+populations_tidy
+
+
 ```
 
 Notre table est désormais sous la forme tidy.

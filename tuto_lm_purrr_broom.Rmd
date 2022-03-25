@@ -41,7 +41,6 @@ library(phyloseq)
 
 ## Fonctions stat
 library(car)
-library(multcomp)
 library(lmerTest)
 library(emmeans)
 

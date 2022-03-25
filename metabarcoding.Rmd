@@ -383,24 +383,24 @@ Pour tester une différence d'expression à l'échelle des OTUs en utilisant DES
 On récupère la matrice de comptage des OTUs à partir de l'objet phyloseq, ainsi que la table de metadata: 
 
 ```{r}
-countData <- otu_table(carbom)
-colData <- sample_data(carbom)
+#countData <- otu_table(carbom)
+#colData <- sample_data(carbom)
 ```
 
 
 ```{r}
 #colData <- as.data.frame(colData)
 #countData <- as.data.frame(countData)
-carbom.sub <- subset_samples(carbom, Traitement %in% c('amoxicilline','temoin_negatif'))
-countData <- otu_table(carbom.sub)
-colData <- sample_data(carbom.sub)
+#carbom.sub <- subset_samples(carbom, Traitement %in% #c('amoxicilline','temoin_negatif'))
+#countData <- otu_table(carbom.sub)
+#colData <- sample_data(carbom.sub)
 
-otu_table(countData.pse) <- otu_table(countData) + 1
+#otu_table(countData.pse) <- otu_table(countData) + 1
 
 
-ds = phyloseq_to_deseq2(carbom.sub, design=~Traitement)
+#ds = phyloseq_to_deseq2(carbom.sub, design=~Traitement)
 
-ds = DESeq(ds)
+#ds = DESeq(ds)
 ```
 
 

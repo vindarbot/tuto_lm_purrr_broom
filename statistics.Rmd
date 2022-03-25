@@ -62,7 +62,9 @@ Plusieurs commandes de base dans R permettent de produire des graphiques pour re
 **Histogramme **
 
 ```{r}
-hist(d$heures.tv, main = "Nombre d'heures passées devant la télé par jour", xlab = "Heures", ylab = "Effectif")
+d$heures.tv
+histo <- hist(d$heures.tv, main = "Nombre d'heures passées devant la télé par jour",  
+     breaks = c(0, 1, 4, 9, 12), xlab = "Heures", ylab = "Probability", probability = TRUE)
 # breaks = c(0, 1, 4, 9, 12)
 #breaks = 7
 ```
@@ -78,25 +80,26 @@ Ici, les options main, xlab et ylab permettent de personnaliser le titre du grap
 
 ```{r}
 plot(ecdf(d$heures.tv))
+d$heures.tv
 ```
 
 **Boîtes à moustaches**
 
 ```{r}
-boxplot(d$heures.tv, main = "Nombre d'heures passées devant la télé par jour", ylab = "Heures")
+boxplot(d$poids, main = "Nombre d'heures passées devant la télé par jour", ylab = "Heures")
 ```
 
 **Etude d'une variable qualtitative**
 
 ```{r}
 freq(d$qualif)
-#freq(d$qualif, cum = TRUE, total = TRUE, sort = "inc", digits = 2, exclude = NA)
+freq(d$qualif, cum = TRUE, total = TRUE, sort = "inc", digits = 2, exclude = NA)
 ```
 
 La colonne n donne les effectifs bruts, la colonne % la répartition en pourcentages et val% la répartition en pourcentages, données manquantes exclues. La fonction accepte plusieurs paramètres permettant d’afficher les totaux, les pourcentages cumulés, de trier selon les effectifs ou de contrôler l’affichage. 
 
 Pour représenter la répartition des effectifs parmi les modalités d’une variable qualitative, on privilégiera les diagrammes de Cleveland, obtenus avec la fonction `dotchart`. On doit appliquer cette fonction au tri à plat de la variable, obtenu avec `table` :
-
+ggplot(table) + aes(x = variable_A, y = variable_B, color = variable_C) + geom_dotplot()
 ```{r}
 dotchart(as.matrix(table(d$clso))[, 1], main = "Sentiment d'appartenance à une classe sociale", pch = 19)
 #dotchart(as.matrix(sort(table(d$qualif)))[, 1], main = "Niveau de qualification")
@@ -121,6 +124,7 @@ Pour confirmer
 À nouveau, commençons par représenter les deux variables :
 
 ```{r}
+#régression linéaire 
 reg <- lm(heures.tv ~ age, data = d)
 summary(reg)
 ```
@@ -179,6 +183,7 @@ if(!file.exists(file))
 
 # charger les données dans l'objet 'debt'
 debt <- read_csv(file)
+debt
 ```
 
 **Les données de l’exemple**
@@ -248,7 +253,7 @@ with(debt, qplot(Year, growth))
 Par ailleurs, dans les deux exemples précédents, on a écrit with(debt, ...) pour indiquer que l’on travaillait avec l’objet debt. Lorsque l’on travaille avec l’extension ggplot2, il est toutefois plus commun d’utiliser l’argument data dans l’appel de qplot pour indiquer ce choix :
 
 ```{r}
-qplot(Year, growth, data = debt)
+qplot(data = debt, Year, growth)
 ```
 
 **Visualisation par petits multiples**
@@ -275,7 +280,7 @@ La section précédente a montré comment utiliser la fonction qplot (quick plot
 Commençons par créer un treillis de base au graphique :
 
 ```{r}
-p <- ggplot(data = debt, aes(y = growth, x = ratio))
+p <-ggplot(data = debt, aes(y = growth, x = ratio))
 ```
 
 Aucun graphique ne s’affiche ici : en effet, ce que l’on a stocké, dans l’objet p, n’est pas un graphique complet, mais une base de travail. Cette base définit les coordonnées x et y du graphique dans l’argument aes (aesthetics). Ici, on a choisi de mettre la variable dépendante de Reinhart et Rogoff, growth (le taux de croissance du PIB), sur l’axe y, et la variable indépendante ratio (le ratio Dette publique / PIB) sur l’axe x.
@@ -283,9 +288,7 @@ Aucun graphique ne s’affiche ici : en effet, ce que l’on a stocké, dans l�
 Rajoutons désormais un objet géométrique, geom_point, qui va projeter, sur le graphique, des points aux coordonnées précédemment définies, et divisons le graphique par un petit multiple, en projetant les points de chaque décennie dans une facette différente du graphique. Ce graphique propose une décomposition temporelle de la relation étudiée par Reinhart et Rogoff :
 
 ```{r}
-p + geom_point() +
-  facet_grid(. ~ Decade) +
-  scale_x_continuous(breaks = seq(0, 200, by = 100))
+p + geom_point() + facet_grid(. ~ Decade) + scale_x_continuous(breaks = seq(0, 200, by = 100))
 ```
 
 Le paramètre facet_grid, qui utilise aussi la syntaxe équation, permet de créer des facettes plus compliquées que celles créées par le paramètre facet_wrap, même si, dans nos exemples, on aurait pu utiliser aussi bien l’un que l’autre.
@@ -315,9 +318,41 @@ Que peut-on dire, à ce stade, du seuil fatidique de Reinhart et Rogoff ? On peu
 Dans le bloc de code ci-dessus, on a stocké l’ensemble de nos modifications dans l’objet p, sans l’afficher ; en effet, on souhaite encore procéder à une dernière modification, en rajoutant une régression locale à travers les points de chaque facette. Après consultation de la documentation de ggplot2 ici et là, on en arrive au code ci-dessous, où p produit le graphique précédent et geom_smooth produit la régression locale :
 
 ```{r}
-p + geom_smooth(method = "loess", se = FALSE,
+p <- p + geom_smooth(method = "loess", se = FALSE,
                 size = 1, color = "black")
 ```
+
+**Exemple de graphique sur le comptage des OTUs**
+
+1) On récupère le fichier d'abondance des OTUs en sortie de FROGS.
+
+2) On enlève les colonnes inutiles.
+
+3) On réordonne la table pour qu'elle soit compatible avec ggplot2.
+
+4) On regroupe par Cluster avec la fonction `group_by`, puis avec `summarise`, on compte le nombre total de séquences par Otu. Enfin on ordonne par ordre décroissant.
+
+5) Juste pour afficher les 20 plus gros OTUs.
+
+6) On récupère dans un vecteur le nom des OTUs dans le bonne ordre.
+
+7) On afficher avec les OTUs dans le bon ordre avec factor (et le paramètre level)
+```{r}
+otu_tab <- read_delim('data/abondances.tabular', delim='\t')
+otu_tab <- otu_tab %>% select(-1,-2)
+
+otu_tab <- otu_tab %>% pivot_longer(c(3:ncol(otu_tab)), names_to = "Sample", values_to = "Count")
+
+otu_tab <- otu_tab %>% group_by(observation_name) %>% summarise( total_count_otu = sum(Count)) %>% arrange(desc(total_count_otu))
+
+otu_tab_head <- otu_tab %>% head(20)
+
+good_order <- otu_tab$observation_name
+
+ggplot(otu_tab_head, aes(x = factor(observation_name , level = good_order), y=total_count_otu) ) + geom_point()
+
+```
+
 
 **Export des graphiques**
 
@@ -337,7 +372,7 @@ A minima, il est nécessaire d’indiquer en troisième lieu une géométrie, au
 ggplot2 reposant sur une syntaxe additive, la syntaxe de base d’un graphique sera donc de la forme :
 
 ```{r}
-#ggplot(data, aes(x = Var1, fill = Var2)) + geom_bar()
+ggplot(data, aes(x = Var1, fill = Var2)) + geom_bar()
 ```
 
 ```{r}
@@ -355,12 +390,12 @@ ggplot(d) +
   xlab("Heures") +
   ylab("Effectifs")
 
-#ggplot(d) +
-#  aes(x = heures.tv) +
-#  geom_histogram(fill ="orange", colour = "black", binwidth = 2) +
-#  ggtitle("Nombres d'heures passées devant la télévision") +
-#  xlab("Heures") +
-#  ylab("Effectifs")
+ggplot(d) +
+  aes(x = heures.tv) +
+  geom_histogram(fill ="orange", colour = "black", binwidth = 2) +
+  ggtitle("Nombres d'heures passées devant la télévision") +
+  xlab("Heures") +
+  ylab("Effectifs")
 ```
 
 ## **Comparaisons (moyennes et proportions)**
